@@ -28,6 +28,7 @@ func readSchema(f string) (*Schema, error) {
 
 func TestValidate(t *testing.T) {
 	tests := []string{
+		"allof",
 		"anyof",
 		"business",
 	  "oneof",
