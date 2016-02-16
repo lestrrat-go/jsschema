@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/url"
 	"reflect"
 
@@ -442,10 +443,10 @@ func (s Schema) validate(rv reflect.Value, def *Schema) (err error) {
 		}
 	case len(def.OneOf) > 0:
 		if pdebug.Enabled {
-			pdebug.Printf("Checking anyOf constraint")
+			pdebug.Printf("Checking oneOf constraint")
 		}
 		count := 0
-		for _, s1 := range def.AnyOf {
+		for _, s1 := range def.OneOf {
 			if err = s.validate(rv, s1); err == nil {
 				count++
 			}
@@ -472,6 +473,21 @@ func (s Schema) validate(rv reflect.Value, def *Schema) (err error) {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr, reflect.Float32, reflect.Float64:
 		if err = matchType(NumberType, def.Type); err != nil {
 			return err
+		}
+
+		if v := def.MultipleOf.Val; v != 0 {
+			var mod float64
+			switch rv.Kind() {
+			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+				mod = math.Mod(float64(rv.Int()), def.MultipleOf.Val)
+			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+				mod = math.Mod(float64(rv.Uint()), def.MultipleOf.Val)
+			case reflect.Float32, reflect.Float64:
+				mod = math.Mod(rv.Float(), def.MultipleOf.Val)
+			}
+			if mod != 0 {
+				return ErrMultipleOfValidationFailed
+			}
 		}
 	default:
 		return ErrInvalidType
@@ -815,6 +831,10 @@ func (s *Schema) extract(m map[string]interface{}) error {
 		return err
 	}
 
+	if err = extractNumber(&s.MultipleOf, m, "multipleOf"); err != nil {
+		return err
+	}
+
 	if s.properties, err = extractSchemaMap(m, "properties"); err != nil {
 		return err
 	}
@@ -824,6 +844,10 @@ func (s *Schema) extract(m map[string]interface{}) error {
 	}
 
 	if s.AnyOf, err = extractSchemaList(m, "anyOf"); err != nil {
+		return err
+	}
+
+	if s.OneOf, err = extractSchemaList(m, "oneOf"); err != nil {
 		return err
 	}
 
@@ -927,6 +951,7 @@ func (s Schema) MarshalJSON() ([]byte, error) {
 	placeSchemaMap(m, "properties", s.properties)
 	placeSchemaList(m, "allOf", s.AllOf)
 	placeSchemaList(m, "anyOf", s.AnyOf)
+	placeSchemaList(m, "oneOf", s.OneOf)
 
 	if s.Default != nil {
 		m["default"] = s.Default
@@ -934,9 +959,13 @@ func (s Schema) MarshalJSON() ([]byte, error) {
 
 	placeString(m, "format", string(s.Format))
 	placeNumber(m, "minimum", s.Minimum)
-	placeBool(m, "exclusiveminimum", s.ExclusiveMinimum, false)
-	placeNumber(m, "Maximum", s.Maximum)
-	placeBool(m, "exclusivemaximum", s.ExclusiveMaximum, false)
+	placeBool(m, "exclusiveMinimum", s.ExclusiveMinimum, false)
+	placeNumber(m, "maximum", s.Maximum)
+	placeBool(m, "exclusiveMaximum", s.ExclusiveMaximum, false)
+
+	if s.MultipleOf.Val != 0 {
+		placeNumber(m, "multipleOf", s.MultipleOf)
+	}
 
 	return json.Marshal(m)
 }

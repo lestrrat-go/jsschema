@@ -30,6 +30,7 @@ func TestValidate(t *testing.T) {
 	tests := []string{
 		"anyof",
 		"business",
+	  "oneof",
 	}
 	for _, name := range tests {
 		schemaf := filepath.Join("test", name+".json")
