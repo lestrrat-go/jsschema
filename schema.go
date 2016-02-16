@@ -422,6 +422,20 @@ func (s Schema) validate(rv reflect.Value, def *Schema) error {
 				return err
 			}
 		}
+	case len(def.AnyOf) > 0:
+		if pdebug.Enabled {
+			pdebug.Printf("Checking anyOf constraint")
+		}
+		ok := false
+		for _, s1 := range def.AnyOf {
+			if err := s.validate(rv, s1); err == nil {
+				ok = true
+				break
+			}
+		}
+		if !ok {
+			return ErrAnyOfValidationFailed
+		}
 	}
 
 	switch rv.Kind() {

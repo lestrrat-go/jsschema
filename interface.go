@@ -8,9 +8,10 @@ import (
 const MIMEType = "application/schema+json"
 
 var (
+	ErrAnyOfValidationFailed = errors.New("anyOf validation failed")
+	ErrInvalidType    = errors.New("invalid type")
 	ErrPropNotFound   = errors.New("property not found")
 	ErrSchemaNotFound = errors.New("schema not found")
-	ErrInvalidType    = errors.New("invalid type")
 )
 
 type PrimitiveType int
