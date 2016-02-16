@@ -27,7 +27,10 @@ func readSchema(f string) (*Schema, error) {
 }
 
 func TestValidate(t *testing.T) {
-	tests := []string{"business"}
+	tests := []string{
+		"anyof",
+		"business",
+	}
 	for _, name := range tests {
 		schemaf := filepath.Join("test", name+".json")
 		schema, err := readSchema(schemaf)

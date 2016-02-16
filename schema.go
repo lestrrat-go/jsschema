@@ -309,11 +309,9 @@ func (s Schema) Validate(v interface{}) error {
 	if pdebug.Enabled {
 		g := pdebug.IPrintf("START Schema.Validate")
 		defer g.IRelease("END Schema.Validate")
-	}
 
-	{
 		buf, _ := json.MarshalIndent(s, "", "  ")
-		pdebug.Printf("%s", buf)
+		pdebug.Printf("schema to validate against: %s", buf)
 	}
 	rv := reflect.ValueOf(v)
 	if rv.Kind() == reflect.Ptr {
@@ -402,13 +400,19 @@ func (s Schema) validateProp(c reflect.Value, pname string, def *Schema, require
 	return nil
 }
 
-func (s Schema) validate(rv reflect.Value, def *Schema) error {
+func (s Schema) validate(rv reflect.Value, def *Schema) (err error) {
 	if pdebug.Enabled {
 		g := pdebug.IPrintf("START Schema.validate")
-		defer g.IRelease("END Schema.validate")
+		defer func() {
+			if err != nil {
+				g.IRelease("END Schema.validate: err = %s", err)
+			} else {
+				g.IRelease("END Schema.validate (PASS)")
+			}
+		}()
 	}
 
-	if err := def.resolveAndMergeReference(); err != nil {
+	if err = def.resolveAndMergeReference(); err != nil {
 		return err
 	}
 
@@ -418,7 +422,7 @@ func (s Schema) validate(rv reflect.Value, def *Schema) error {
 			pdebug.Printf("Checking allOf constraint")
 		}
 		for _, s1 := range def.AllOf {
-			if err := s.validate(rv, s1); err != nil {
+			if err = s.validate(rv, s1); err != nil {
 				return err
 			}
 		}
@@ -428,7 +432,7 @@ func (s Schema) validate(rv reflect.Value, def *Schema) error {
 		}
 		ok := false
 		for _, s1 := range def.AnyOf {
-			if err := s.validate(rv, s1); err == nil {
+			if err = s.validate(rv, s1); err == nil {
 				ok = true
 				break
 			}
@@ -436,20 +440,37 @@ func (s Schema) validate(rv reflect.Value, def *Schema) error {
 		if !ok {
 			return ErrAnyOfValidationFailed
 		}
+	case len(def.OneOf) > 0:
+		if pdebug.Enabled {
+			pdebug.Printf("Checking anyOf constraint")
+		}
+		count := 0
+		for _, s1 := range def.AnyOf {
+			if err = s.validate(rv, s1); err == nil {
+				count++
+			}
+		}
+		if count != 1 {
+			return ErrOneOfValidationFailed
+		}
 	}
 
 	switch rv.Kind() {
 	case reflect.Map, reflect.Struct:
-		if err := matchType(ObjectType, def.Type); err != nil {
+		if err = matchType(ObjectType, def.Type); err != nil {
 			return err
 		}
 		for pname, pdef := range def.properties {
-			if err := s.validateProp(rv, pname, pdef, def.isPropRequired(pname)); err != nil {
+			if err = s.validateProp(rv, pname, pdef, def.isPropRequired(pname)); err != nil {
 				return err
 			}
 		}
 	case reflect.String:
-		if err := matchType(StringType, def.Type); err != nil {
+		if err = matchType(StringType, def.Type); err != nil {
+			return err
+		}
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr, reflect.Float32, reflect.Float64:
+		if err = matchType(NumberType, def.Type); err != nil {
 			return err
 		}
 	default:
@@ -802,6 +823,10 @@ func (s *Schema) extract(m map[string]interface{}) error {
 		return err
 	}
 
+	if s.AnyOf, err = extractSchemaList(m, "anyOf"); err != nil {
+		return err
+	}
+
 	s.applyParentSchema()
 
 	return nil
@@ -901,6 +926,7 @@ func (s Schema) MarshalJSON() ([]byte, error) {
 
 	placeSchemaMap(m, "properties", s.properties)
 	placeSchemaList(m, "allOf", s.AllOf)
+	placeSchemaList(m, "anyOf", s.AnyOf)
 
 	if s.Default != nil {
 		m["default"] = s.Default
