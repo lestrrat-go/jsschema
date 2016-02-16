@@ -293,17 +293,22 @@ func (s1 *Schema) merge(s2 *Schema) {
 	s1.Not = s2.Not
 }
 
-func (s *Schema) resolveAndMergeReference() error {
+// Resolve the current schema reference, if '$ref' exists
+func (s *Schema) resolveCurrentSchemaReference() (*Schema, error) {
 	if s.Reference == "" {
-		return nil
+		return s, nil
 	}
-	ref, err := s.ResolveReference(s.Reference)
+	thing, err := s.ResolveReference(s.Reference)
 	if err != nil {
-		return ErrInvalidReference{Reference: s.Reference, Message: err.Error()}
+		return nil, ErrInvalidReference{Reference: s.Reference, Message: err.Error()}
 	}
-	s.merge(ref.(*Schema))
-	s.Reference = ""
-	return nil
+
+	ref, ok := thing.(*Schema)
+	if !ok {
+		return nil, ErrInvalidReference{Reference: s.Reference, Message: "returned element is not a Schema"}
+	}
+
+	return ref, nil
 }
 
 func (s Schema) Validate(v interface{}) error {
@@ -370,14 +375,15 @@ func matchType(t PrimitiveType, list PrimitiveTypes) error {
 	return nil
 }
 
-func (s Schema) validateProp(c reflect.Value, pname string, def *Schema, required bool) error {
+func (s Schema) validateProp(c reflect.Value, pname string, def *Schema, required bool) (err error) {
 	if pdebug.Enabled {
 		g := pdebug.IPrintf("START Schema.validateProp '%s'", pname)
 		defer g.IRelease("END Schema.validateProp '%s'", pname)
 	}
 
-	if err := def.resolveAndMergeReference(); err != nil {
-		return err
+	def, err = def.resolveCurrentSchemaReference()
+	if err != nil {
+		return
 	}
 	pv := getProp(c, pname)
 	if pv.Kind() == reflect.Interface {
@@ -390,15 +396,15 @@ func (s Schema) validateProp(c reflect.Value, pname string, def *Schema, require
 			if pdebug.Enabled {
 				pdebug.Printf("Property %s is required, but not found", pname)
 			}
-			return ErrRequiredField{Name: pname}
+			err = ErrRequiredField{Name: pname}
 		}
-		return nil
+		return
 	}
 
-	if err := s.validate(pv, def); err != nil {
-		return err
+	if err = s.validate(pv, def); err != nil {
+		return
 	}
-	return nil
+	return
 }
 
 func (s Schema) validate(rv reflect.Value, def *Schema) (err error) {
@@ -413,8 +419,9 @@ func (s Schema) validate(rv reflect.Value, def *Schema) (err error) {
 		}()
 	}
 
-	if err = def.resolveAndMergeReference(); err != nil {
-		return err
+	def, err = def.resolveCurrentSchemaReference()
+	if err != nil {
+		return
 	}
 
 	switch {
@@ -424,7 +431,7 @@ func (s Schema) validate(rv reflect.Value, def *Schema) (err error) {
 		}
 		for _, s1 := range def.AllOf {
 			if err = s.validate(rv, s1); err != nil {
-				return err
+				return
 			}
 		}
 	case len(def.AnyOf) > 0:
@@ -439,7 +446,8 @@ func (s Schema) validate(rv reflect.Value, def *Schema) (err error) {
 			}
 		}
 		if !ok {
-			return ErrAnyOfValidationFailed
+			err = ErrAnyOfValidationFailed
+			return
 		}
 	case len(def.OneOf) > 0:
 		if pdebug.Enabled {
@@ -452,27 +460,28 @@ func (s Schema) validate(rv reflect.Value, def *Schema) (err error) {
 			}
 		}
 		if count != 1 {
-			return ErrOneOfValidationFailed
+			err = ErrOneOfValidationFailed
+			return
 		}
 	}
 
 	switch rv.Kind() {
 	case reflect.Map, reflect.Struct:
 		if err = matchType(ObjectType, def.Type); err != nil {
-			return err
+			return
 		}
 		for pname, pdef := range def.properties {
 			if err = s.validateProp(rv, pname, pdef, def.isPropRequired(pname)); err != nil {
-				return err
+				return
 			}
 		}
 	case reflect.String:
 		if err = matchType(StringType, def.Type); err != nil {
-			return err
+			return
 		}
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr, reflect.Float32, reflect.Float64:
 		if err = matchType(NumberType, def.Type); err != nil {
-			return err
+			return
 		}
 
 		if v := def.MultipleOf.Val; v != 0 {
@@ -486,11 +495,13 @@ func (s Schema) validate(rv reflect.Value, def *Schema) (err error) {
 				mod = math.Mod(rv.Float(), def.MultipleOf.Val)
 			}
 			if mod != 0 {
-				return ErrMultipleOfValidationFailed
+				err = ErrMultipleOfValidationFailed
+				return
 			}
 		}
 	default:
-		return ErrInvalidType
+		err = ErrInvalidType
+		return
 	}
 	return nil
 }
