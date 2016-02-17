@@ -10,6 +10,7 @@ const MIMEType = "application/schema+json"
 var (
 	ErrAdditionalProperties       = errors.New("additional properties are not allowed")
 	ErrAnyOfValidationFailed      = errors.New("'anyOf' validation failed")
+	ErrArrayItemValidationFailed  = errors.New("'array' validation failed")
 	ErrOneOfValidationFailed      = errors.New("'oneOf' validation failed")
 	ErrIntegerValidationFailed    = errors.New("'integer' validation failed")
 	ErrInvalidFormat              = errors.New("invalid format")
@@ -133,7 +134,7 @@ type Schema struct {
 	// ArrayValidations
 	AllowAdditionalItems bool
 	AdditionalItems      []*Schema
-	Items                []*Schema
+	Items                *ItemSpec
 	minItems             Integer
 	maxItems             Integer
 	UniqueItems          Bool
@@ -159,3 +160,8 @@ type AdditionalProperties struct {
 }
 
 type DependencyMap map[string]interface{}
+
+type ItemSpec struct {
+	TupleMode bool // If this is true, the positions mean something. if false, len(Schemas) should be 1, and we should apply the same schema validation to all elements
+	Schemas   []*Schema
+}

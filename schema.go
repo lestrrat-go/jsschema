@@ -152,9 +152,11 @@ func (s *Schema) applyParentSchema() {
 		v.setParent(s)
 		v.applyParentSchema()
 	}
-	for _, v := range s.Items {
-		v.setParent(s)
-		v.applyParentSchema()
+	if items := s.Items; items != nil {
+		for _, v := range items.Schemas {
+			v.setParent(s)
+			v.applyParentSchema()
+		}
 	}
 
 	for _, v := range s.properties {
@@ -673,6 +675,27 @@ func validateNumber(rv reflect.Value, def *Schema) (err error) {
 	return nil
 }
 
+func validateArray(rv reflect.Value, items *ItemSpec) error {
+	if items.TupleMode {
+		itemLen := len(items.Schemas)
+		for i := 0; i < rv.Len(); i++ {
+			if i >= itemLen {
+				return ErrArrayItemValidationFailed
+			}
+			if err := validate(rv.Index(i), items.Schemas[i]); err != nil {
+				return err
+			}
+		}
+	} else {
+		for i := 0; i < rv.Len(); i++ {
+			if err := validate(rv.Index(i), items.Schemas[0]); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func validateObject(rv reflect.Value, def *Schema) error {
 	names, err := getPropNames(rv)
 	if err != nil {
@@ -845,6 +868,16 @@ func validate(rv reflect.Value, def *Schema) (err error) {
 		}
 		if err = validateObject(rv, def); err != nil {
 			return
+		}
+	case reflect.Slice:
+		if err = matchType(ArrayType, def.Type); err != nil {
+			return
+		}
+
+		if items := def.Items; items != nil {
+			if err = validateArray(rv, items); err != nil {
+				return
+			}
 		}
 	case reflect.String:
 		// Make sure string type is allowed here
@@ -1161,6 +1194,32 @@ func extractRegexpToSchemaMap(m map[string]interface{}, name string) (map[*regex
 	return nil, nil
 }
 
+func extractItems(res **ItemSpec, m map[string]interface{}, name string) error {
+	v, ok := m[name]
+	if !ok {
+		return nil
+	}
+
+	tupleMode := false
+	switch v.(type) {
+	case []interface{}:
+		tupleMode = true
+	case map[string]interface{}:
+	default:
+		return ErrInvalidFieldValue{Name: name}
+	}
+
+	items := ItemSpec{}
+	items.TupleMode = tupleMode
+
+	var err error
+	if items.Schemas, err = extractSchemaList(m, name); err != nil {
+		return err
+	}
+	*res = &items
+	return nil
+}
+
 func extractDependecies(res *DependencyMap, m map[string]interface{}, name string) error {
 	v, ok := m[name]
 	if !ok {
@@ -1281,7 +1340,7 @@ func (s *Schema) extract(m map[string]interface{}) error {
 		return err
 	}
 
-	if s.Items, err = extractSchemaList(m, "items"); err != nil {
+	if err = extractItems(&s.Items, m, "items"); err != nil {
 		return err
 	}
 
@@ -1486,12 +1545,12 @@ func (s Schema) MarshalJSON() ([]byte, error) {
 	}
 	placeSchemaMap(m, "definitions", s.Definitions)
 
-	switch len(s.Items) {
-	case 0: // do nothing
-	case 1:
-		m["items"] = s.Items[0]
-	case 2:
-		m["items"] = s.Items
+	if items := s.Items; items != nil {
+		if items.TupleMode {
+			m["items"] = s.Items.Schemas
+		} else {
+			m["items"] = s.Items.Schemas[0]
+		}
 	}
 
 	placeSchemaMap(m, "properties", s.properties)

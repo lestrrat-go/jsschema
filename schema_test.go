@@ -30,6 +30,7 @@ func TestValidate(t *testing.T) {
 	tests := []string{
 		"allof",
 		"anyof",
+		"array",
 		"business",
 		"integer",
 		"not",
