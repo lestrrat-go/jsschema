@@ -22,6 +22,14 @@ func (e ErrMaxLengthValidationFailed) Error() string {
 	return fmt.Sprintf("required maximum length not met: %d > %d", e.Len, e.MaxLength)
 }
 
+func (e ErrMinItemsValidationFailed) Error() string {
+	return fmt.Sprintf("required minimum item count not met: %d < %d", e.Len, e.MinItems)
+}
+
+func (e ErrMaxItemsValidationFailed) Error() string {
+	return fmt.Sprintf("required maximum item count not met: %d > %d", e.Len, e.MaxItems)
+}
+
 func (e ErrMinPropertiesValidationFailed) Error() string {
 	return fmt.Sprintf("number of properties fewer than minimum number: %d < %d", e.Num, e.Min)
 }

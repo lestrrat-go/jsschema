@@ -148,9 +148,11 @@ func (s *Schema) applyParentSchema() {
 		v.applyParentSchema()
 	}
 
-	for _, v := range s.AdditionalItems {
-		v.setParent(s)
-		v.applyParentSchema()
+	if items := s.AdditionalItems; items != nil {
+		if sc := items.Schema; sc != nil {
+			sc.setParent(s)
+			sc.applyParentSchema()
+		}
 	}
 	if items := s.Items; items != nil {
 		for _, v := range items.Schemas {
@@ -517,6 +519,17 @@ func isDomainName(s string) bool {
 	return ok
 }
 
+func validateEnum(rv reflect.Value, enum []interface{}) error {
+	iv := rv.Interface()
+	for _, v := range enum {
+		if iv == v {
+			return nil
+		}
+	}
+
+	return ErrInvalidEnum
+}
+
 // Assumes rv is a string (Kind == String)
 func validateString(rv reflect.Value, def *Schema) (err error) {
 	if pdebug.Enabled {
@@ -547,6 +560,12 @@ func validateString(rv reflect.Value, def *Schema) (err error) {
 	if def.Pattern != nil {
 		if !def.Pattern.MatchString(rv.String()) {
 			err = ErrPatternValidationFailed{Str: rv.String(), Pattern: def.Pattern}
+			return
+		}
+	}
+
+	if len(def.Enum) > 0 {
+		if err = validateEnum(rv, def.Enum); err != nil {
 			return
 		}
 	}
@@ -618,6 +637,12 @@ func validateNumber(rv reflect.Value, def *Schema) (err error) {
 		}()
 	}
 
+	if len(def.Enum) > 0 {
+		if err = validateEnum(rv, def.Enum); err != nil {
+			return
+		}
+	}
+
 	var f float64
 	// Force value to be float64 so that it's easier to handle
 	switch rv.Kind() {
@@ -675,21 +700,77 @@ func validateNumber(rv reflect.Value, def *Schema) (err error) {
 	return nil
 }
 
-func validateArray(rv reflect.Value, items *ItemSpec) error {
-	if items.TupleMode {
-		itemLen := len(items.Schemas)
-		for i := 0; i < rv.Len(); i++ {
-			if i >= itemLen {
-				return ErrArrayItemValidationFailed
+func validateArray(rv reflect.Value, def *Schema) (err error) {
+	if pdebug.Enabled {
+		g := pdebug.IPrintf("START validateArray")
+		defer func() {
+			if err != nil {
+				g.IRelease("END validateArray: err = %s", err)
+			} else {
+				g.IRelease("END validateArray (PASS)")
 			}
-			if err := validate(rv.Index(i), items.Schemas[i]); err != nil {
-				return err
+		}()
+	}
+
+	if def.MinItems.Initialized || def.MaxItems.Initialized {
+		l := rv.Len()
+		if def.MinItems.Initialized {
+			if min := def.MinItems.Val; min > l {
+				return ErrMinItemsValidationFailed{Len: l, MinItems: min}
 			}
 		}
-	} else {
-		for i := 0; i < rv.Len(); i++ {
-			if err := validate(rv.Index(i), items.Schemas[0]); err != nil {
-				return err
+		if def.MaxItems.Initialized {
+			if max := def.MaxItems.Val; max < l {
+				return ErrMaxItemsValidationFailed{Len: l, MaxItems: max}
+			}
+		}
+	}
+
+	if items := def.Items; items != nil {
+		if items.TupleMode {
+			itemLen := len(items.Schemas)
+			for i := 0; i < rv.Len(); i++ {
+				if pdebug.Enabled {
+					pdebug.Printf("Validating element %d", i)
+				}
+				if i >= itemLen {
+					if def.AdditionalItems == nil { // additional items not allowed
+						return ErrArrayItemValidationFailed
+					}
+					return nil
+				}
+				ev := rv.Index(i)
+				if ev.Kind() == reflect.Interface {
+					ev = ev.Elem()
+				}
+				if err := validate(ev, items.Schemas[i]); err != nil {
+					return err
+				}
+			}
+		} else {
+			for i := 0; i < rv.Len(); i++ {
+				if pdebug.Enabled {
+					pdebug.Printf("Validating element %d", i)
+				}
+				ev := rv.Index(i)
+				if ev.Kind() == reflect.Interface {
+					ev = ev.Elem()
+				}
+				if err := validate(ev, items.Schemas[0]); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	if def.UniqueItems.Bool() {
+		for i := 0; i < rv.Len()-1; i++ {
+			ev1 := rv.Index(i).Interface()
+			for j := i + 1; j < rv.Len(); j++ {
+				ev2 := rv.Index(j).Interface()
+				if ev1 == ev2 {
+					return ErrUniqueItemsValidationFailed
+				}
 			}
 		}
 	}
@@ -703,7 +784,7 @@ func validateObject(rv reflect.Value, def *Schema) error {
 	}
 
 	if def.MinProperties.Initialized || def.MaxProperties.Initialized {
-		// Need to count... 
+		// Need to count...
 		count := 0
 		for _, name := range names {
 			if pv := getProp(rv, name); pv != zeroval {
@@ -874,10 +955,8 @@ func validate(rv reflect.Value, def *Schema) (err error) {
 			return
 		}
 
-		if items := def.Items; items != nil {
-			if err = validateArray(rv, items); err != nil {
-				return
-			}
+		if err = validateArray(rv, def); err != nil {
+			return
 		}
 	case reflect.String:
 		// Make sure string type is allowed here
@@ -933,14 +1012,6 @@ func (s Schema) Scope() string {
 	}
 
 	return s.parent.Scope()
-}
-
-func (s Schema) MaxItems() int {
-	return s.maxItems.Val
-}
-
-func (s Schema) MinItems() int {
-	return s.minItems.Val
 }
 
 func (s Schema) Properties() []string {
@@ -1356,11 +1427,11 @@ func (s *Schema) extract(m map[string]interface{}) error {
 		return err
 	}
 
-	if extractInt(&s.minItems, m, "minItems"); err != nil {
+	if extractInt(&s.MinItems, m, "minItems"); err != nil {
 		return err
 	}
 
-	if extractInt(&s.maxItems, m, "maxItems"); err != nil {
+	if extractInt(&s.MaxItems, m, "maxItems"); err != nil {
 		return err
 	}
 
@@ -1404,6 +1475,25 @@ func (s *Schema) extract(m map[string]interface{}) error {
 		return err
 	}
 
+	if _, ok := m["additionalItems"]; !ok {
+		// doesn't exist. it's an empty schema
+		s.AdditionalItems = &AdditionalItems{}
+	} else {
+		var b Bool
+		if err = extractBool(&b, m, "additionalItems", true); err == nil {
+			if b.Bool() {
+				s.AdditionalItems = &AdditionalItems{}
+			}
+		} else {
+			// Oh, it's not a boolean?
+			var apSchema *Schema
+			if apSchema, err = extractSchema(m, "additionalItems"); err != nil {
+				return err
+			}
+			s.AdditionalItems = &AdditionalItems{apSchema}
+		}
+	}
+
 	if _, ok := m["additionalProperties"]; !ok {
 		// doesn't exist. it's an empty schema
 		s.AdditionalProperties = &AdditionalProperties{}
@@ -1412,7 +1502,6 @@ func (s *Schema) extract(m map[string]interface{}) error {
 		if err = extractBool(&b, m, "additionalProperties", true); err == nil {
 			if b.Bool() {
 				s.AdditionalProperties = &AdditionalProperties{}
-			} else {
 			}
 		} else {
 			// Oh, it's not a boolean?
@@ -1527,8 +1616,12 @@ func (s Schema) MarshalJSON() ([]byte, error) {
 		m["type"] = s.Type
 	}
 
-	if s.AllowAdditionalItems {
-		m["additionalItems"] = true
+	if items := s.AdditionalItems; items != nil {
+		if items.Schema != nil {
+			place(m, "additionalItems", items.Schema)
+		}
+	} else {
+		place(m, "additionalItems", false)
 	}
 
 	if rx := s.Pattern; rx != nil {
@@ -1536,8 +1629,8 @@ func (s Schema) MarshalJSON() ([]byte, error) {
 	}
 	placeInteger(m, "maxLength", s.MaxLength)
 	placeInteger(m, "minLength", s.MinLength)
-	placeInteger(m, "maxItems", s.maxItems)
-	placeInteger(m, "minItems", s.minItems)
+	placeInteger(m, "maxItems", s.MaxItems)
+	placeInteger(m, "minItems", s.MinItems)
 	placeInteger(m, "maxProperties", s.MaxProperties)
 	placeInteger(m, "minProperties", s.MinProperties)
 	if s.UniqueItems.Initialized {

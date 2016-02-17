@@ -8,21 +8,23 @@ import (
 const MIMEType = "application/schema+json"
 
 var (
-	ErrAdditionalProperties       = errors.New("additional properties are not allowed")
-	ErrAnyOfValidationFailed      = errors.New("'anyOf' validation failed")
-	ErrArrayItemValidationFailed  = errors.New("'array' validation failed")
-	ErrOneOfValidationFailed      = errors.New("'oneOf' validation failed")
-	ErrIntegerValidationFailed    = errors.New("'integer' validation failed")
-	ErrInvalidFormat              = errors.New("invalid format")
-	ErrInvalidHostname            = errors.New("invalid hostname")
-	ErrInvalidIPv4                = errors.New("invalid IPv4 address")
-	ErrInvalidIPv6                = errors.New("invalid IPv6 address")
-	ErrInvalidType                = errors.New("invalid type")
-	ErrMultipleOfValidationFailed = errors.New("'multipleOf' validation failed")
-	ErrNotValidationFailed        = errors.New("'not' validation failed")
-	ErrNumberValidationFailed     = errors.New("'number' validation failed")
-	ErrPropNotFound               = errors.New("property not found")
-	ErrSchemaNotFound             = errors.New("schema not found")
+	ErrAdditionalProperties        = errors.New("additional properties are not allowed")
+	ErrAnyOfValidationFailed       = errors.New("'anyOf' validation failed")
+	ErrArrayItemValidationFailed   = errors.New("'array' validation failed")
+	ErrOneOfValidationFailed       = errors.New("'oneOf' validation failed")
+	ErrIntegerValidationFailed     = errors.New("'integer' validation failed")
+	ErrInvalidEnum                 = errors.New("invalid enum type")
+	ErrInvalidFormat               = errors.New("invalid format")
+	ErrInvalidHostname             = errors.New("invalid hostname")
+	ErrInvalidIPv4                 = errors.New("invalid IPv4 address")
+	ErrInvalidIPv6                 = errors.New("invalid IPv6 address")
+	ErrInvalidType                 = errors.New("invalid type")
+	ErrMultipleOfValidationFailed  = errors.New("'multipleOf' validation failed")
+	ErrNotValidationFailed         = errors.New("'not' validation failed")
+	ErrNumberValidationFailed      = errors.New("'number' validation failed")
+	ErrPropNotFound                = errors.New("property not found")
+	ErrUniqueItemsValidationFailed = errors.New("'uniqueItems' validation failed")
+	ErrSchemaNotFound              = errors.New("schema not found")
 )
 
 type PrimitiveType int
@@ -55,6 +57,14 @@ type ErrMinLengthValidationFailed struct {
 type ErrMaxLengthValidationFailed struct {
 	Len       int
 	MaxLength int
+}
+type ErrMinItemsValidationFailed struct {
+	Len      int
+	MinItems int
+}
+type ErrMaxItemsValidationFailed struct {
+	Len      int
+	MaxItems int
 }
 type ErrMinPropertiesValidationFailed struct {
 	Num int
@@ -132,12 +142,11 @@ type Schema struct {
 	Pattern   *regexp.Regexp `json:"pattern,omitempty"`
 
 	// ArrayValidations
-	AllowAdditionalItems bool
-	AdditionalItems      []*Schema
-	Items                *ItemSpec
-	minItems             Integer
-	maxItems             Integer
-	UniqueItems          Bool
+	AdditionalItems *AdditionalItems
+	Items           *ItemSpec
+	MinItems        Integer
+	MaxItems        Integer
+	UniqueItems     Bool
 
 	// ObjectValidations
 	MaxProperties        Integer                    `json:"maxProperties,omitempty"`
@@ -153,6 +162,10 @@ type Schema struct {
 	AnyOf []*Schema     `json:"anyOf,omitempty"`
 	OneOf []*Schema     `json:"oneOf,omitempty"`
 	Not   *Schema       `json:"not,omitempty"`
+}
+
+type AdditionalItems struct {
+	*Schema
 }
 
 type AdditionalProperties struct {

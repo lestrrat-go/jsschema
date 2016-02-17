@@ -31,6 +31,10 @@ func TestValidate(t *testing.T) {
 		"allof",
 		"anyof",
 		"array",
+		"arraylength",
+		"arraytuple",
+		"arraytuple_disallow_additional",
+		"arrayunique",
 		"business",
 		"integer",
 		"not",
@@ -45,6 +49,7 @@ func TestValidate(t *testing.T) {
 	}
 	for _, name := range tests {
 		schemaf := filepath.Join("test", name+".json")
+		t.Logf("Reading schema file %s", schemaf)
 		schema, err := readSchema(schemaf)
 		if !assert.NoError(t, err, "reading schema file %s should succeed", schemaf) {
 			return
@@ -53,7 +58,7 @@ func TestValidate(t *testing.T) {
 		pat := filepath.Join("test", fmt.Sprintf("%s_pass*.json", name))
 		files, _ := filepath.Glob(pat)
 		for _, passf := range files {
-			t.Logf("Testing schema against %s", passf)
+			t.Logf("Testing schema against %s (expect to PASS)", passf)
 			passin, err := os.Open(passf)
 			if !assert.NoError(t, err, "os.Open(%s) should succeed", passf) {
 				return
@@ -71,7 +76,7 @@ func TestValidate(t *testing.T) {
 		pat = filepath.Join("test", fmt.Sprintf("%s_fail*.json", name))
 		files, _ = filepath.Glob(pat)
 		for _, failf := range files {
-			t.Logf("Testing schema against %s", failf)
+			t.Logf("Testing schema against %s (expect to FAIL)", failf)
 			failin, err := os.Open(failf)
 			if !assert.NoError(t, err, "os.Open(%s) should succeed", failf) {
 				return
