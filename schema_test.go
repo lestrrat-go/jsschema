@@ -31,6 +31,7 @@ func TestValidate(t *testing.T) {
 		"allof",
 		"anyof",
 		"business",
+		"integer",
 		"not",
 		"oneof",
 		"strlen",

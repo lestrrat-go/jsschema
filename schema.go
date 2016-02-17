@@ -554,7 +554,29 @@ func validate(rv reflect.Value, def *Schema) (err error) {
 			return
 		}
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr, reflect.Float32, reflect.Float64:
+		typeOK := false
+		intOK := true
+		if err = matchType(IntegerType, def.Type); err == nil {
+			// Check if this is a valid integer
+			if f := rv.Float(); math.Floor(f) == f {
+				// it's valid, bail out of this type checking, because we're all good
+				typeOK = true
+				goto TYPECHECK_DONE
+			}
+			intOK = false
+		}
+
 		if err = matchType(NumberType, def.Type); err != nil {
+			return
+		}
+		typeOK = true
+	TYPECHECK_DONE:
+		if !typeOK {
+			if !intOK {
+				err = ErrIntegerValidationFailed
+			} else {
+				err = ErrNumberValidationFailed
+			}
 			return
 		}
 
@@ -574,6 +596,9 @@ func validate(rv reflect.Value, def *Schema) (err error) {
 			}
 		}
 	default:
+		if pdebug.Enabled {
+			pdebug.Printf("object type is invalid: %s", rv.Kind())
+		}
 		err = ErrInvalidType
 		return
 	}

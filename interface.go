@@ -10,6 +10,7 @@ const MIMEType = "application/schema+json"
 var (
 	ErrAnyOfValidationFailed      = errors.New("'anyOf' validation failed")
 	ErrOneOfValidationFailed      = errors.New("'oneOf' validation failed")
+	ErrIntegerValidationFailed    = errors.New("'integer' validation failed")
 	ErrInvalidFormat              = errors.New("invalid format")
 	ErrInvalidHostname            = errors.New("invalid hostname")
 	ErrInvalidIPv4                = errors.New("invalid IPv4 address")
@@ -17,6 +18,7 @@ var (
 	ErrInvalidType                = errors.New("invalid type")
 	ErrMultipleOfValidationFailed = errors.New("'multipleOf' validation failed")
 	ErrNotValidationFailed        = errors.New("'not' validation failed")
+	ErrNumberValidationFailed     = errors.New("'number' validation failed")
 	ErrPropNotFound               = errors.New("property not found")
 	ErrSchemaNotFound             = errors.New("schema not found")
 )
