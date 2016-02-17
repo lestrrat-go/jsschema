@@ -151,20 +151,21 @@ func extractRegexp(r **regexp.Regexp, m map[string]interface{}, s string) error 
 	return nil
 }
 
-func extractSchema(m map[string]interface{}, name string) (*Schema, error) {
-	if v, ok := m[name]; ok {
-		switch v.(type) {
-		case map[string]interface{}:
-		default:
-			return nil, ErrInvalidType
-		}
-		s := New()
-		if err := s.extract(v.(map[string]interface{})); err != nil {
-			return nil, err
-		}
-		return s, nil
+func extractSchema(s **Schema, m map[string]interface{}, name string) error {
+	v, ok := m[name]
+	if !ok {
+		return nil
 	}
-	return nil, nil
+	switch v.(type) {
+	case map[string]interface{}:
+	default:
+		return ErrInvalidType
+	}
+	*s = New()
+	if err := (*s).extract(v.(map[string]interface{})); err != nil {
+		return err
+	}
+	return nil
 }
 
 func extractSchemaList(m map[string]interface{}, name string) ([]*Schema, error) {
@@ -477,7 +478,7 @@ func (s *Schema) extract(m map[string]interface{}) error {
 		} else {
 			// Oh, it's not a boolean?
 			var apSchema *Schema
-			if apSchema, err = extractSchema(m, "additionalItems"); err != nil {
+			if err = extractSchema(&apSchema, m, "additionalItems"); err != nil {
 				return err
 			}
 			s.AdditionalItems = &AdditionalItems{apSchema}
@@ -496,7 +497,7 @@ func (s *Schema) extract(m map[string]interface{}) error {
 		} else {
 			// Oh, it's not a boolean?
 			var apSchema *Schema
-			if apSchema, err = extractSchema(m, "additionalProperties"); err != nil {
+			if err = extractSchema(&apSchema, m, "additionalProperties"); err != nil {
 				return err
 			}
 			s.AdditionalProperties = &AdditionalProperties{apSchema}
@@ -523,7 +524,7 @@ func (s *Schema) extract(m map[string]interface{}) error {
 		return err
 	}
 
-	if s.Not, err = extractSchema(m, "not"); err != nil {
+	if err = extractSchema(&s.Not, m, "not"); err != nil {
 		return err
 	}
 
