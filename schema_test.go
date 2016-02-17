@@ -33,6 +33,7 @@ func TestValidate(t *testing.T) {
 		"business",
 		"integer",
 		"not",
+		"numrange",
 		"oneof",
 		"strlen",
 		"strpattern",

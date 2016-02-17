@@ -465,6 +465,75 @@ func validateString(rv reflect.Value, def *Schema) (err error) {
 	return nil
 }
 
+func validateNumber(rv reflect.Value, def *Schema) (err error) {
+	if pdebug.Enabled {
+		g := pdebug.IPrintf("START validateNumber")
+		defer func() {
+			if err != nil {
+				g.IRelease("END validateNumber: err = %s", err)
+			} else {
+				g.IRelease("END validateNumber (PASS)")
+			}
+		}()
+	}
+
+	var f float64
+	// Force value to be float64 so that it's easier to handle
+	switch rv.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		f = float64(rv.Int())
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		f = float64(rv.Uint())
+	case reflect.Float32, reflect.Float64:
+		f = rv.Float()
+	}
+
+	if def.Minimum.Initialized {
+		if def.ExclusiveMinimum {
+			if f < def.Minimum.Val {
+				err = ErrMinimumValidationFailed{Num: f, Min: def.Minimum.Val, Exclusive: true}
+				return
+			}
+		} else {
+			if f <= def.Minimum.Val {
+				err = ErrMinimumValidationFailed{Num: f, Min: def.Minimum.Val, Exclusive: false}
+				return
+			}
+		}
+	}
+
+	if def.Maximum.Initialized {
+		if def.ExclusiveMaximum {
+			if f > def.Maximum.Val {
+				err = ErrMaximumValidationFailed{Num: f, Max: def.Maximum.Val, Exclusive: true}
+				return
+			}
+		} else {
+			if f >= def.Maximum.Val {
+				err = ErrMaximumValidationFailed{Num: f, Max: def.Maximum.Val, Exclusive: false}
+				return
+			}
+		}
+	}
+
+	if v := def.MultipleOf.Val; v != 0 {
+		var mod float64
+		switch rv.Kind() {
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			mod = math.Mod(f, def.MultipleOf.Val)
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+			mod = math.Mod(f, def.MultipleOf.Val)
+		case reflect.Float32, reflect.Float64:
+			mod = math.Mod(f, def.MultipleOf.Val)
+		}
+		if mod != 0 {
+			err = ErrMultipleOfValidationFailed
+			return
+		}
+	}
+	return nil
+}
+
 func validate(rv reflect.Value, def *Schema) (err error) {
 	if pdebug.Enabled {
 		g := pdebug.IPrintf("START validate")
@@ -580,20 +649,8 @@ func validate(rv reflect.Value, def *Schema) (err error) {
 			return
 		}
 
-		if v := def.MultipleOf.Val; v != 0 {
-			var mod float64
-			switch rv.Kind() {
-			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-				mod = math.Mod(float64(rv.Int()), def.MultipleOf.Val)
-			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-				mod = math.Mod(float64(rv.Uint()), def.MultipleOf.Val)
-			case reflect.Float32, reflect.Float64:
-				mod = math.Mod(rv.Float(), def.MultipleOf.Val)
-			}
-			if mod != 0 {
-				err = ErrMultipleOfValidationFailed
-				return
-			}
+		if err = validateNumber(rv, def); err != nil {
+			return
 		}
 	default:
 		if pdebug.Enabled {

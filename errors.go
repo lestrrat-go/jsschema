@@ -25,3 +25,21 @@ func (e ErrMaxLengthValidationFailed) Error() string {
 func (e ErrPatternValidationFailed) Error() string {
 	return fmt.Sprintf("pattern did not match: '%s' does not match '%s'", e.Str, e.Pattern)
 }
+
+func (e ErrMinimumValidationFailed) Error() string {
+	sign := "<="
+	if e.Exclusive {
+		sign = "<"
+	}
+	return fmt.Sprintf("value exceeds minimum: %d %s %d", e.Num, sign, e.Min)
+}
+
+func (e ErrMaximumValidationFailed) Error() string {
+	sign := ">="
+	if e.Exclusive {
+		sign = ">"
+	}
+	return fmt.Sprintf("value exceeds maximum: %d %s %d", e.Num, sign, e.Max)
+}
+
+

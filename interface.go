@@ -36,6 +36,16 @@ type ErrInvalidReference struct {
 	Reference string
 	Message   string
 }
+type ErrMinimumValidationFailed struct {
+	Num       float64
+	Min       float64
+	Exclusive bool
+}
+type ErrMaximumValidationFailed struct {
+	Num       float64
+	Max       float64
+	Exclusive bool
+}
 type ErrMinLengthValidationFailed struct {
 	Len       int
 	MinLength int
