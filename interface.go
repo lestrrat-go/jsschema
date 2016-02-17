@@ -30,6 +30,14 @@ type ErrInvalidReference struct {
 	Reference string
 	Message   string
 }
+type ErrMinLengthValidationFailed struct {
+	Len       int
+	MinLength int
+}
+type ErrMaxLengthValidationFailed struct {
+	Len       int
+	MaxLength int
+}
 
 const (
 	FormatDateTime Format = "date-time"
@@ -88,8 +96,8 @@ type Schema struct {
 	ExclusiveMaximum bool   `json:"exclusiveMaximum,omitempty"`
 
 	// StringValidation
-	maxLength integer
-	minLength integer
+	MaxLength integer        `json:"maxLength,omitempty"`
+	MinLength integer        `json:"minLength,omitempty"`
 	Pattern   *regexp.Regexp `json:"pattern,omitempty"`
 
 	// ArrayValidations

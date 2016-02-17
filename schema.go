@@ -2,7 +2,6 @@ package schema
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"math"
 	"net/url"
@@ -210,18 +209,6 @@ func (s *Schema) ResolveReference(v string) (r interface{}, err error) {
 	return
 }
 
-func (e ErrInvalidFieldValue) Error() string {
-	return fmt.Sprintf("invalid value for field %s", e.Name)
-}
-
-func (e ErrInvalidReference) Error() string {
-	return fmt.Sprintf("failed to resolve reference '%s': %s", e.Reference, e.Message)
-}
-
-func (e ErrRequiredField) Error() string {
-	return fmt.Sprintf("required field '%s' not found", e.Name)
-}
-
 // Resolve the current schema reference, if '$ref' exists
 func (s *Schema) resolveCurrentSchemaReference() (*Schema, error) {
 	if s.Reference == "" {
@@ -306,8 +293,8 @@ func matchType(t PrimitiveType, list PrimitiveTypes) error {
 
 func validateProp(c reflect.Value, pname string, def *Schema, required bool) (err error) {
 	if pdebug.Enabled {
-		g := pdebug.IPrintf("START Schema.validateProp '%s'", pname)
-		defer g.IRelease("END Schema.validateProp '%s'", pname)
+		g := pdebug.IPrintf("START validateProp '%s'", pname)
+		defer g.IRelease("END validateProp '%s'", pname)
 	}
 
 	def, err = def.resolveCurrentSchemaReference()
@@ -336,14 +323,44 @@ func validateProp(c reflect.Value, pname string, def *Schema, required bool) (er
 	return
 }
 
-func validate(rv reflect.Value, def *Schema) (err error) {
+// Assumes rv is a string (Kind == String)
+func validateString(rv reflect.Value, def *Schema) (err error) {
 	if pdebug.Enabled {
-		g := pdebug.IPrintf("START Schema.validate")
+		g := pdebug.IPrintf("START validateString")
 		defer func() {
 			if err != nil {
-				g.IRelease("END Schema.validate: err = %s", err)
+				g.IRelease("END validateString: err = %s", err)
 			} else {
-				g.IRelease("END Schema.validate (PASS)")
+				g.IRelease("END validateString (PASS)")
+			}
+		}()
+	}
+
+	if def.MinLength.Initialized {
+		if v := def.MinLength.Val; rv.Len() < v {
+			err = ErrMinLengthValidationFailed{Len: rv.Len(), MinLength: v}
+			return
+		}
+	}
+
+	if def.MaxLength.Initialized {
+		if v := def.MaxLength.Val; rv.Len() > v {
+			err = ErrMaxLengthValidationFailed{Len: rv.Len(), MaxLength: v}
+			return
+		}
+	}
+	err = nil
+	return
+}
+
+func validate(rv reflect.Value, def *Schema) (err error) {
+	if pdebug.Enabled {
+		g := pdebug.IPrintf("START validate")
+		defer func() {
+			if err != nil {
+				g.IRelease("END validate: err = %s", err)
+			} else {
+				g.IRelease("END validate (PASS)")
 			}
 		}()
 	}
@@ -417,7 +434,11 @@ func validate(rv reflect.Value, def *Schema) (err error) {
 			}
 		}
 	case reflect.String:
+		// Make sure string type is allowed here
 		if err = matchType(StringType, def.Type); err != nil {
+			return
+		}
+		if err = validateString(rv, def); err != nil {
 			return
 		}
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr, reflect.Float32, reflect.Float64:
@@ -453,14 +474,6 @@ func (s Schema) Scope() string {
 	}
 
 	return s.parent.Scope()
-}
-
-func (s Schema) MaxLength() int {
-	return s.maxLength.Val
-}
-
-func (s Schema) MinLength() int {
-	return s.minLength.Val
 }
 
 func (s Schema) MaxItems() int {
@@ -503,13 +516,13 @@ func extractInt(n *integer, m map[string]interface{}, s string) error {
 	}
 
 	switch v.(type) {
-	case int:
+	case float64:
+		n.Val = int(v.(float64))
+		n.Initialized = true
 	default:
 		return ErrInvalidFieldValue{Name: s}
 	}
 
-	n.Val = v.(int)
-	n.Initialized = true
 	return nil
 }
 
@@ -755,6 +768,14 @@ func (s *Schema) extract(m map[string]interface{}) error {
 		return err
 	}
 
+	if extractInt(&s.MinLength, m, "minLength"); err != nil {
+		return err
+	}
+
+	if extractInt(&s.MaxLength, m, "maxLength"); err != nil {
+		return err
+	}
+
 	if extractInt(&s.minItems, m, "minItems"); err != nil {
 		return err
 	}
@@ -901,6 +922,8 @@ func (s Schema) MarshalJSON() ([]byte, error) {
 		m["additionalItems"] = true
 	}
 
+	placeInteger(m, "maxLength", s.MaxLength)
+	placeInteger(m, "minLength", s.MinLength)
 	placeInteger(m, "maxItems", s.maxItems)
 	placeInteger(m, "minItems", s.minItems)
 	placeInteger(m, "maxProperties", s.MaxProperties)
