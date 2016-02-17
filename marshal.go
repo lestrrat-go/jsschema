@@ -71,29 +71,30 @@ func extractString(s *string, m map[string]interface{}, name string) error {
 	return nil
 }
 
-func extractStringList(m map[string]interface{}, s string) ([]string, error) {
+func extractStringList(l *[]string, m map[string]interface{}, s string) error {
 	if v, ok := m[s]; ok {
 		switch v.(type) {
 		case string:
-			return []string{v.(string)}, nil
+			*l = []string{v.(string)}
+			return nil
 		case []interface{}:
-			l := v.([]interface{})
-			r := make([]string, len(l))
-			for i, x := range l {
+			src := v.([]interface{})
+			*l = make([]string, len(src))
+			for i, x := range src {
 				switch x.(type) {
 				case string:
-					r[i] = x.(string)
+					(*l)[i] = x.(string)
 				default:
-					return nil, ErrInvalidFieldValue{Name: s}
+					return ErrInvalidFieldValue{Name: s}
 				}
 			}
-			return r, nil
+			return nil
 		default:
-			return nil, ErrInvalidFieldValue{Name: s}
+			return ErrInvalidFieldValue{Name: s}
 		}
 	}
 
-	return nil, nil
+	return nil
 }
 
 func extractFormat(f *Format, m map[string]interface{}, s string) error {
@@ -345,7 +346,7 @@ func (s *Schema) extract(m map[string]interface{}) error {
 		return err
 	}
 
-	if s.Required, err = extractStringList(m, "required"); err != nil {
+	if err = extractStringList(&s.Required, m, "required"); err != nil {
 		return err
 	}
 
