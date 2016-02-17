@@ -253,7 +253,7 @@ func (s Schema) Validate(v interface{}) error {
 		rv = rv.Elem()
 	}
 
-	if err := s.validate(rv, &s); err != nil {
+	if err := validate(rv, &s); err != nil {
 		return err
 	}
 
@@ -304,7 +304,7 @@ func matchType(t PrimitiveType, list PrimitiveTypes) error {
 	return nil
 }
 
-func (s Schema) validateProp(c reflect.Value, pname string, def *Schema, required bool) (err error) {
+func validateProp(c reflect.Value, pname string, def *Schema, required bool) (err error) {
 	if pdebug.Enabled {
 		g := pdebug.IPrintf("START Schema.validateProp '%s'", pname)
 		defer g.IRelease("END Schema.validateProp '%s'", pname)
@@ -330,13 +330,13 @@ func (s Schema) validateProp(c reflect.Value, pname string, def *Schema, require
 		return
 	}
 
-	if err = s.validate(pv, def); err != nil {
+	if err = validate(pv, def); err != nil {
 		return
 	}
 	return
 }
 
-func (s Schema) validate(rv reflect.Value, def *Schema) (err error) {
+func validate(rv reflect.Value, def *Schema) (err error) {
 	if pdebug.Enabled {
 		g := pdebug.IPrintf("START Schema.validate")
 		defer func() {
@@ -360,7 +360,7 @@ func (s Schema) validate(rv reflect.Value, def *Schema) (err error) {
 		}
 
 		// Everything is peachy, if errors do occur
-		if err2 := s.validate(rv, def.Not); err2 == nil {
+		if err2 := validate(rv, def.Not); err2 == nil {
 			err = ErrNotValidationFailed
 			return
 		}
@@ -369,7 +369,7 @@ func (s Schema) validate(rv reflect.Value, def *Schema) (err error) {
 			pdebug.Printf("Checking 'allOf' constraint")
 		}
 		for _, s1 := range def.AllOf {
-			if err = s.validate(rv, s1); err != nil {
+			if err = validate(rv, s1); err != nil {
 				return
 			}
 		}
@@ -380,7 +380,7 @@ func (s Schema) validate(rv reflect.Value, def *Schema) (err error) {
 		ok := false
 		for _, s1 := range def.AnyOf {
 			// don't use err from upper scope
-			if err := s.validate(rv, s1); err == nil {
+			if err := validate(rv, s1); err == nil {
 				ok = true
 				break
 			}
@@ -396,7 +396,7 @@ func (s Schema) validate(rv reflect.Value, def *Schema) (err error) {
 		count := 0
 		for _, s1 := range def.OneOf {
 			// don't use err from upper scope
-			if err := s.validate(rv, s1); err == nil {
+			if err := validate(rv, s1); err == nil {
 				count++
 			}
 		}
@@ -412,7 +412,7 @@ func (s Schema) validate(rv reflect.Value, def *Schema) (err error) {
 			return
 		}
 		for pname, pdef := range def.properties {
-			if err = s.validateProp(rv, pname, pdef, def.isPropRequired(pname)); err != nil {
+			if err = validateProp(rv, pname, pdef, def.isPropRequired(pname)); err != nil {
 				return
 			}
 		}
