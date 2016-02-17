@@ -4,9 +4,12 @@ import (
 	"encoding/json"
 	"io"
 	"math"
+	"net"
+	"net/mail"
 	"net/url"
 	"reflect"
 	"regexp"
+	"time"
 
 	"github.com/lestrrat/go-jspointer"
 	"github.com/lestrrat/go-pdebug"
@@ -324,6 +327,55 @@ func validateProp(c reflect.Value, pname string, def *Schema, required bool) (er
 	return
 }
 
+// stolen from src/net/dnsclient.go
+func isDomainName(s string) bool {
+	// See RFC 1035, RFC 3696.
+	if len(s) == 0 {
+		return false
+	}
+	if len(s) > 255 {
+		return false
+	}
+
+	last := byte('.')
+	ok := false // Ok once we've seen a letter.
+	partlen := 0
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch {
+		default:
+			return false
+		case 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z' || c == '_':
+			ok = true
+			partlen++
+		case '0' <= c && c <= '9':
+			// fine
+			partlen++
+		case c == '-':
+			// Byte before dash cannot be dot.
+			if last == '.' {
+				return false
+			}
+			partlen++
+		case c == '.':
+			// Byte before dot cannot be dot, dash.
+			if last == '.' || last == '-' {
+				return false
+			}
+			if partlen > 63 || partlen == 0 {
+				return false
+			}
+			partlen = 0
+		}
+		last = c
+	}
+	if last == '-' || partlen > 63 {
+		return false
+	}
+
+	return ok
+}
+
 // Assumes rv is a string (Kind == String)
 func validateString(rv reflect.Value, def *Schema) (err error) {
 	if pdebug.Enabled {
@@ -354,6 +406,58 @@ func validateString(rv reflect.Value, def *Schema) (err error) {
 	if def.Pattern != nil {
 		if !def.Pattern.MatchString(rv.String()) {
 			err = ErrPatternValidationFailed{Str: rv.String(), Pattern: def.Pattern}
+			return
+		}
+	}
+
+	if def.Format != "" {
+		s := rv.String()
+		switch def.Format {
+		case FormatDateTime:
+			if _, err = time.Parse(time.RFC3339, s); err != nil {
+				return
+			}
+		case FormatEmail:
+			if _, err = mail.ParseAddress(s); err != nil {
+				return
+			}
+		case FormatHostname:
+			if !isDomainName(s) {
+				err = ErrInvalidHostname
+				return
+			}
+		case FormatIPv4:
+			// Should only contain numbers and "."
+			for _, r := range s {
+				switch {
+				case r == 0x2E || 0x30 <= r && r <= 0x39:
+				default:
+					err = ErrInvalidIPv4
+					return
+				}
+			}
+			if addr := net.ParseIP(s); addr == nil {
+				err = ErrInvalidIPv4
+			}
+		case FormatIPv6:
+			// Should only contain numbers and ":"
+			for _, r := range s {
+				switch {
+				case r == 0x3A || 0x30 <= r && r <= 0x39:
+				default:
+					err = ErrInvalidIPv6
+					return
+				}
+			}
+			if addr := net.ParseIP(s); addr == nil {
+				err = ErrInvalidIPv6
+			}
+		case FormatURI:
+			if _, err = url.Parse(s); err != nil {
+				return
+			}
+		default:
+			err = ErrInvalidFormat
 			return
 		}
 	}
