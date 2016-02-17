@@ -39,6 +39,7 @@ func TestValidate(t *testing.T) {
 		"business",
 		"integer",
 		"not",
+		"null",
 		"numrange",
 		"objectpatterns",
 		"objectpropdepend",
