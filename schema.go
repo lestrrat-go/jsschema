@@ -455,7 +455,11 @@ func validateProp(c reflect.Value, pname string, def *Schema, required bool) (er
 
 	if pv == zeroval {
 		// no prop by name of pname. is this required?
-		if required {
+		if !required {
+			if pdebug.Enabled {
+				pdebug.Printf("Property %s not found, but is not required", pname)
+			}
+		} else {
 			if pdebug.Enabled {
 				pdebug.Printf("Property %s is required, but not found", pname)
 			}
@@ -876,6 +880,12 @@ func validateObject(rv reflect.Value, def *Schema) error {
 	if def.AdditionalProperties == nil {
 		if len(namesMap) > 0 {
 			return ErrAdditionalProperties
+		}
+	} else {
+		for pname := range namesMap {
+			if err := validateProp(rv, pname, def.AdditionalProperties.Schema, false); err != nil {
+				return err
+			}
 		}
 	}
 
