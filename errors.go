@@ -21,3 +21,7 @@ func (e ErrMinLengthValidationFailed) Error() string {
 func (e ErrMaxLengthValidationFailed) Error() string {
 	return fmt.Sprintf("required maximum length not met: %d > %d", e.Len, e.MaxLength)
 }
+
+func (e ErrPatternValidationFailed) Error() string {
+	return fmt.Sprintf("pattern did not match: '%s' does not match '%s'", e.Str, e.Pattern)
+}

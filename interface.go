@@ -38,6 +38,10 @@ type ErrMaxLengthValidationFailed struct {
 	Len       int
 	MaxLength int
 }
+type ErrPatternValidationFailed struct {
+	Str     string
+	Pattern *regexp.Regexp
+}
 
 const (
 	FormatDateTime Format = "date-time"

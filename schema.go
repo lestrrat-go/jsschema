@@ -6,6 +6,7 @@ import (
 	"math"
 	"net/url"
 	"reflect"
+	"regexp"
 
 	"github.com/lestrrat/go-jspointer"
 	"github.com/lestrrat/go-pdebug"
@@ -349,8 +350,15 @@ func validateString(rv reflect.Value, def *Schema) (err error) {
 			return
 		}
 	}
-	err = nil
-	return
+
+	if def.Pattern != nil {
+		if !def.Pattern.MatchString(rv.String()) {
+			err = ErrPatternValidationFailed{Str: rv.String(), Pattern: def.Pattern}
+			return
+		}
+	}
+
+	return nil
 }
 
 func validate(rv reflect.Value, def *Schema) (err error) {
@@ -618,6 +626,18 @@ func extractInterfaceList(m map[string]interface{}, s string) ([]interface{}, er
 	return nil, nil
 }
 
+func extractRegexp(m map[string]interface{}, s string) (*regexp.Regexp, error) {
+	if v, ok := m[s]; ok {
+		switch v.(type) {
+		case string:
+			return regexp.Compile(v.(string))
+		default:
+			return nil, ErrInvalidType
+		}
+	}
+	return nil, nil
+}
+
 func extractSchema(m map[string]interface{}, name string) (*Schema, error) {
 	if v, ok := m[name]; ok {
 		switch v.(type) {
@@ -765,6 +785,10 @@ func (s *Schema) extract(m map[string]interface{}) error {
 	}
 
 	if s.Items, err = extractSchemaList(m, "items"); err != nil {
+		return err
+	}
+
+	if s.Pattern, err = extractRegexp(m, "pattern"); err != nil {
 		return err
 	}
 
@@ -922,6 +946,9 @@ func (s Schema) MarshalJSON() ([]byte, error) {
 		m["additionalItems"] = true
 	}
 
+	if rx := s.Pattern; rx != nil {
+		placeString(m, "pattern", rx.String())
+	}
 	placeInteger(m, "maxLength", s.MaxLength)
 	placeInteger(m, "minLength", s.MinLength)
 	placeInteger(m, "maxItems", s.maxItems)
