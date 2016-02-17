@@ -134,16 +134,21 @@ func extractInterfaceList(l *[]interface{}, m map[string]interface{}, s string) 
 	return nil
 }
 
-func extractRegexp(m map[string]interface{}, s string) (*regexp.Regexp, error) {
+func extractRegexp(r **regexp.Regexp, m map[string]interface{}, s string) error {
 	if v, ok := m[s]; ok {
 		switch v.(type) {
 		case string:
-			return regexp.Compile(v.(string))
+			rx, err := regexp.Compile(v.(string))
+			if err != nil {
+				return err
+			}
+			*r = rx
+			return nil
 		default:
-			return nil, ErrInvalidType
+			return ErrInvalidType
 		}
 	}
-	return nil, nil
+	return nil
 }
 
 func extractSchema(m map[string]interface{}, name string) (*Schema, error) {
@@ -400,7 +405,7 @@ func (s *Schema) extract(m map[string]interface{}) error {
 		return err
 	}
 
-	if s.Pattern, err = extractRegexp(m, "pattern"); err != nil {
+	if err = extractRegexp(&s.Pattern, m, "pattern"); err != nil {
 		return err
 	}
 
