@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/mail"
 	"net/url"
+	"os"
 	"reflect"
 	"regexp"
 	"time"
@@ -26,6 +27,15 @@ func New() *Schema {
 		schemaByID:      make(map[string]*Schema),
 	}
 	return s
+}
+
+func ReadFile(f string) (*Schema, error) {
+	in, err := os.Open(f)
+	if err != nil {
+		return nil, err
+	}
+	defer in.Close()
+	return Read(in)
 }
 
 func Read(in io.Reader) (*Schema, error) {
