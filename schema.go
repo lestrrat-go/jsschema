@@ -958,6 +958,10 @@ func validate(rv reflect.Value, def *Schema) (err error) {
 		if err = validateArray(rv, def); err != nil {
 			return
 		}
+	case reflect.Bool:
+		if err = matchType(BooleanType, def.Type); err != nil {
+			return
+		}
 	case reflect.String:
 		// Make sure string type is allowed here
 		if err = matchType(StringType, def.Type); err != nil {

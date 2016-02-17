@@ -35,6 +35,7 @@ func TestValidate(t *testing.T) {
 		"arraytuple",
 		"arraytuple_disallow_additional",
 		"arrayunique",
+		"boolean",
 		"business",
 		"integer",
 		"not",
