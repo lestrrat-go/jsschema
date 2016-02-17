@@ -158,6 +158,12 @@ func (s *Schema) applyParentSchema() {
 		v.applyParentSchema()
 	}
 
+	if props := s.AdditionalProperties; props != nil {
+		if sc := props.Schema; sc != nil {
+			sc.setParent(s)
+			sc.applyParentSchema()
+		}
+	}
 	if items := s.AdditionalItems; items != nil {
 		if sc := items.Schema; sc != nil {
 			sc.setParent(s)
@@ -1031,7 +1037,14 @@ func validate(rv reflect.Value, def *Schema) (err error) {
 }
 
 func (s Schema) Scope() string {
+	if pdebug.Enabled {
+		g := pdebug.IPrintf("START Schema.Scope")
+		defer g.IRelease("END Schema.Scope")
+	}
 	if s.id != "" || s.parent == nil {
+		if pdebug.Enabled {
+			pdebug.Printf("Returning id '%s'", s.id)
+		}
 		return s.id
 	}
 
