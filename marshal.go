@@ -110,11 +110,12 @@ func extractJSPointer(s *string, m map[string]interface{}, name string) error {
 	return extractString(s, m, name)
 }
 
-func extractInterface(m map[string]interface{}, s string) (interface{}, error) {
+func extractInterface(r *interface{}, m map[string]interface{}, s string) error {
 	if v, ok := m[s]; ok {
-		return v, nil
+		*r = v
+		return nil
 	}
-	return nil, nil
+	return nil
 }
 
 func extractInterfaceList(m map[string]interface{}, s string) ([]interface{}, error) {
@@ -361,7 +362,7 @@ func (s *Schema) extract(m map[string]interface{}) error {
 		return err
 	}
 
-	if s.Default, err = extractInterface(m, "default"); err != nil {
+	if err = extractInterface(&s.Default, m, "default"); err != nil {
 		return err
 	}
 
