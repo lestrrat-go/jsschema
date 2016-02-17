@@ -354,9 +354,19 @@ func (s Schema) validate(rv reflect.Value, def *Schema) (err error) {
 	}
 
 	switch {
+	case def.Not != nil:
+		if pdebug.Enabled {
+			pdebug.Printf("Checking 'not' constraint")
+		}
+
+		// Everything is peachy, if errors do occur
+		if err2 := s.validate(rv, def.Not); err2 == nil {
+			err = ErrNotValidationFailed
+			return
+		}
 	case len(def.AllOf) > 0:
 		if pdebug.Enabled {
-			pdebug.Printf("Checking allOf constraint")
+			pdebug.Printf("Checking 'allOf' constraint")
 		}
 		for _, s1 := range def.AllOf {
 			if err = s.validate(rv, s1); err != nil {
@@ -365,11 +375,12 @@ func (s Schema) validate(rv reflect.Value, def *Schema) (err error) {
 		}
 	case len(def.AnyOf) > 0:
 		if pdebug.Enabled {
-			pdebug.Printf("Checking anyOf constraint")
+			pdebug.Printf("Checking 'anyOf' constraint")
 		}
 		ok := false
 		for _, s1 := range def.AnyOf {
-			if err = s.validate(rv, s1); err == nil {
+			// don't use err from upper scope
+			if err := s.validate(rv, s1); err == nil {
 				ok = true
 				break
 			}
@@ -380,11 +391,12 @@ func (s Schema) validate(rv reflect.Value, def *Schema) (err error) {
 		}
 	case len(def.OneOf) > 0:
 		if pdebug.Enabled {
-			pdebug.Printf("Checking oneOf constraint")
+			pdebug.Printf("Checking 'oneOf' constraint")
 		}
 		count := 0
 		for _, s1 := range def.OneOf {
-			if err = s.validate(rv, s1); err == nil {
+			// don't use err from upper scope
+			if err := s.validate(rv, s1); err == nil {
 				count++
 			}
 		}
@@ -593,12 +605,20 @@ func extractInterfaceList(m map[string]interface{}, s string) ([]interface{}, er
 	return nil, nil
 }
 
-func extractSchema(m map[string]interface{}) (*Schema, error) {
-	s := New()
-	if err := s.extract(m); err != nil {
-		return nil, err
+func extractSchema(m map[string]interface{}, name string) (*Schema, error) {
+	if v, ok := m[name]; ok {
+		switch v.(type) {
+		case map[string]interface{}:
+		default:
+			return nil, ErrInvalidType
+		}
+		s := New()
+		if err := s.extract(v.(map[string]interface{})); err != nil {
+			return nil, err
+		}
+		return s, nil
 	}
-	return s, nil
+	return nil, nil
 }
 
 func extractSchemaList(m map[string]interface{}, name string) ([]*Schema, error) {
@@ -791,32 +811,40 @@ func (s *Schema) extract(m map[string]interface{}) error {
 		return err
 	}
 
+	if s.Not, err = extractSchema(m, "not"); err != nil {
+		return err
+	}
+
 	s.applyParentSchema()
 
 	return nil
 }
 
+func place(m map[string]interface{}, name string, v interface{}) {
+	m[name] = v
+}
+
 func placeString(m map[string]interface{}, name, s string) {
 	if s != "" {
-		m[name] = s
+		place(m, name, s)
 	}
 }
 
 func placeList(m map[string]interface{}, name string, l []interface{}) {
 	if len(l) > 0 {
-		m[name] = l
+		place(m, name, l)
 	}
 }
 func placeSchemaList(m map[string]interface{}, name string, l []*Schema) {
 	if len(l) > 0 {
-		m[name] = l
+		place(m, name, l)
 	}
 }
 
 func placeSchemaMap(m map[string]interface{}, name string, l map[string]*Schema) {
 	if len(l) > 0 {
 		defs := make(map[string]*Schema)
-		m[name] = defs
+		place(m, name, defs)
 
 		for k, v := range l {
 			defs[k] = v
@@ -826,7 +854,7 @@ func placeSchemaMap(m map[string]interface{}, name string, l map[string]*Schema)
 
 func placeStringList(m map[string]interface{}, name string, l []string) {
 	if len(l) > 0 {
-		m[name] = l
+		place(m, name, l)
 	}
 }
 
@@ -834,21 +862,21 @@ func placeBool(m map[string]interface{}, name string, value bool, def bool) {
 	if value == def { // no need to record default values
 		return
 	}
-	m[name] = value
+	place(m, name, value)
 }
 
 func placeNumber(m map[string]interface{}, name string, n Number) {
 	if !n.Initialized {
 		return
 	}
-	m[name] = n.Val
+	place(m, name, n.Val)
 }
 
 func placeInteger(m map[string]interface{}, name string, n integer) {
 	if !n.Initialized {
 		return
 	}
-	m[name] = n.Val
+	place(m, name, n.Val)
 }
 
 func (s Schema) MarshalJSON() ([]byte, error) {
@@ -905,6 +933,10 @@ func (s Schema) MarshalJSON() ([]byte, error) {
 
 	if s.MultipleOf.Val != 0 {
 		placeNumber(m, "multipleOf", s.MultipleOf)
+	}
+
+	if v := s.Not; v != nil {
+		place(m, "not", v)
 	}
 
 	return json.Marshal(m)

@@ -8,10 +8,11 @@ import (
 const MIMEType = "application/schema+json"
 
 var (
-	ErrAnyOfValidationFailed      = errors.New("anyOf validation failed")
-	ErrOneOfValidationFailed      = errors.New("oneOf validation failed")
+	ErrAnyOfValidationFailed      = errors.New("'anyOf' validation failed")
+	ErrOneOfValidationFailed      = errors.New("'oneOf' validation failed")
 	ErrInvalidType                = errors.New("invalid type")
-	ErrMultipleOfValidationFailed = errors.New("multipleOf validation failed")
+	ErrMultipleOfValidationFailed = errors.New("'multipleOf' validation failed")
+	ErrNotValidationFailed        = errors.New("'not' validation failed")
 	ErrPropNotFound               = errors.New("property not found")
 	ErrSchemaNotFound             = errors.New("schema not found")
 )

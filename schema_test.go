@@ -31,6 +31,7 @@ func TestValidate(t *testing.T) {
 		"allof",
 		"anyof",
 		"business",
+		"not",
 	  "oneof",
 	}
 	for _, name := range tests {
