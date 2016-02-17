@@ -106,13 +106,8 @@ func extractFormat(f *Format, m map[string]interface{}, s string) error {
 	return nil
 }
 
-func extractJSPointer(m map[string]interface{}, s string) (string, error) {
-	var v string
-	if err := extractString(&v, m, s); err != nil {
-		return "", err
-	}
-
-	return v, nil
+func extractJSPointer(s *string, m map[string]interface{}, name string) error {
+	return extractString(s, m, name)
 }
 
 func extractInterface(m map[string]interface{}, s string) (interface{}, error) {
@@ -350,11 +345,11 @@ func (s *Schema) extract(m map[string]interface{}) error {
 		return err
 	}
 
-	if s.SchemaRef, err = extractJSPointer(m, "$schema"); err != nil {
+	if err = extractJSPointer(&s.SchemaRef, m, "$schema"); err != nil {
 		return err
 	}
 
-	if s.Reference, err = extractJSPointer(m, "$ref"); err != nil {
+	if err = extractJSPointer(&s.Reference, m, "$ref"); err != nil {
 		return err
 	}
 
