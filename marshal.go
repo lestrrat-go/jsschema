@@ -100,7 +100,7 @@ func extractStringList(l *[]string, m map[string]interface{}, s string) error {
 func extractFormat(f *Format, m map[string]interface{}, s string) error {
 	var v string
 	if err := extractString(&v, m, s); err != nil {
-		return  err
+		return err
 	}
 	*f = Format(v)
 	return nil
@@ -113,42 +113,43 @@ func extractJSPointer(s *string, m map[string]interface{}, name string) error {
 func extractInterface(r *interface{}, m map[string]interface{}, s string) error {
 	if v, ok := m[s]; ok {
 		*r = v
-		return nil
 	}
 	return nil
 }
 
 func extractInterfaceList(l *[]interface{}, m map[string]interface{}, s string) error {
-	if v, ok := m[s]; ok {
-		switch v.(type) {
-		case []interface{}:
-			src := v.([]interface{})
-			*l = make([]interface{}, len(src))
-			copy(*l, src)
-			return nil
-		default:
-			return ErrInvalidFieldValue{Name: s}
-		}
+	v, ok := m[s]
+	if !ok {
+		return nil
 	}
 
-	return nil
+	switch v.(type) {
+	case []interface{}:
+		src := v.([]interface{})
+		*l = make([]interface{}, len(src))
+		copy(*l, src)
+		return nil
+	default:
+		return ErrInvalidFieldValue{Name: s}
+	}
 }
 
 func extractRegexp(r **regexp.Regexp, m map[string]interface{}, s string) error {
-	if v, ok := m[s]; ok {
-		switch v.(type) {
-		case string:
-			rx, err := regexp.Compile(v.(string))
-			if err != nil {
-				return err
-			}
-			*r = rx
-			return nil
-		default:
-			return ErrInvalidType
-		}
+	v, ok := m[s]
+	if !ok {
+		return nil
 	}
-	return nil
+	switch v.(type) {
+	case string:
+		rx, err := regexp.Compile(v.(string))
+		if err != nil {
+			return err
+		}
+		*r = rx
+		return nil
+	default:
+		return ErrInvalidType
+	}
 }
 
 func extractSchema(s **Schema, m map[string]interface{}, name string) error {
@@ -168,32 +169,34 @@ func extractSchema(s **Schema, m map[string]interface{}, name string) error {
 	return nil
 }
 
-func extractSchemaList(m map[string]interface{}, name string) ([]*Schema, error) {
-	if v, ok := m[name]; ok {
-		switch v.(type) {
-		case []interface{}:
-			l := v.([]interface{})
-			r := make([]*Schema, len(l))
-			for i, d := range l {
-				s := New()
-				if err := s.extract(d.(map[string]interface{})); err != nil {
-					return nil, err
-				}
-				r[i] = s
-			}
-			return r, nil
-		case map[string]interface{}:
-			s := New()
-			if err := s.extract(v.(map[string]interface{})); err != nil {
-				return nil, err
-			}
-			return []*Schema{s}, nil
-		default:
-			return nil, ErrInvalidFieldValue{Name: name}
-		}
+func extractSchemaList(l *[]*Schema, m map[string]interface{}, name string) error {
+	v, ok := m[name]
+	if !ok {
+		return nil
 	}
 
-	return nil, nil
+	switch v.(type) {
+	case []interface{}:
+		src := v.([]interface{})
+		*l = make([]*Schema, len(src))
+		for i, d := range src {
+			s := New()
+			if err := s.extract(d.(map[string]interface{})); err != nil {
+				return err
+			}
+			(*l)[i] = s
+		}
+		return nil
+	case map[string]interface{}:
+		s := New()
+		if err := s.extract(v.(map[string]interface{})); err != nil {
+			return err
+		}
+		*l = []*Schema{s}
+		return nil
+	default:
+		return ErrInvalidFieldValue{Name: name}
+	}
 }
 
 func extractSchemaMap(m map[string]interface{}, name string) (map[string]*Schema, error) {
@@ -275,7 +278,7 @@ func extractItems(res **ItemSpec, m map[string]interface{}, name string) error {
 	items.TupleMode = tupleMode
 
 	var err error
-	if items.Schemas, err = extractSchemaList(m, name); err != nil {
+	if err = extractSchemaList(&items.Schemas, m, name); err != nil {
 		return err
 	}
 	*res = &items
@@ -512,15 +515,15 @@ func (s *Schema) extract(m map[string]interface{}) error {
 		return err
 	}
 
-	if s.AllOf, err = extractSchemaList(m, "allOf"); err != nil {
+	if err = extractSchemaList(&s.AllOf, m, "allOf"); err != nil {
 		return err
 	}
 
-	if s.AnyOf, err = extractSchemaList(m, "anyOf"); err != nil {
+	if err = extractSchemaList(&s.AnyOf, m, "anyOf"); err != nil {
 		return err
 	}
 
-	if s.OneOf, err = extractSchemaList(m, "oneOf"); err != nil {
+	if err = extractSchemaList(&s.OneOf, m, "oneOf"); err != nil {
 		return err
 	}
 
