@@ -153,7 +153,7 @@ type Schema struct {
 	MinProperties        Integer                    `json:"minProperties,omitempty"`
 	Required             []string                   `json:"required,omitempty"`
 	Dependencies         DependencyMap              `json:"dependencies,omitempty"`
-	properties           map[string]*Schema         `json:"properties,omitempty"`
+	Properties           map[string]*Schema         `json:"properties,omitempty"`
 	AdditionalProperties *AdditionalProperties      `json:"additionalProperties,omitempty"`
 	PatternProperties    map[*regexp.Regexp]*Schema `json:"patternProperties,omitempty"`
 

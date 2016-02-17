@@ -161,7 +161,7 @@ func (s *Schema) applyParentSchema() {
 		}
 	}
 
-	for _, v := range s.properties {
+	for _, v := range s.Properties {
 		v.setParent(s)
 		v.applyParentSchema()
 	}
@@ -809,7 +809,7 @@ func validateObject(rv reflect.Value, def *Schema) error {
 		namesMap[name] = struct{}{}
 	}
 
-	for pname, pdef := range def.properties {
+	for pname, pdef := range def.Properties {
 		delete(namesMap, pname)
 		if err := validateProp(rv, pname, pdef, def.isPropRequired(pname)); err != nil {
 			return err
@@ -1016,14 +1016,6 @@ func (s Schema) Scope() string {
 	}
 
 	return s.parent.Scope()
-}
-
-func (s Schema) Properties() []string {
-	l := make([]string, 0, len(s.properties))
-	for k := range s.properties {
-		l = append(l, k)
-	}
-	return l
 }
 
 func extractNumber(n *Number, m map[string]interface{}, s string) error {
@@ -1471,7 +1463,7 @@ func (s *Schema) extract(m map[string]interface{}) error {
 		return err
 	}
 
-	if s.properties, err = extractSchemaMap(m, "properties"); err != nil {
+	if s.Properties, err = extractSchemaMap(m, "properties"); err != nil {
 		return err
 	}
 
@@ -1521,7 +1513,7 @@ func (s *Schema) extract(m map[string]interface{}) error {
 		return err
 	}
 
-	if s.properties, err = extractSchemaMap(m, "properties"); err != nil {
+	if s.Properties, err = extractSchemaMap(m, "properties"); err != nil {
 		return err
 	}
 
@@ -1650,7 +1642,7 @@ func (s Schema) MarshalJSON() ([]byte, error) {
 		}
 	}
 
-	placeSchemaMap(m, "properties", s.properties)
+	placeSchemaMap(m, "properties", s.Properties)
 	if len(s.PatternProperties) > 0 {
 		rxm := make(map[string]*Schema)
 		for rx, rxs := range s.PatternProperties {
