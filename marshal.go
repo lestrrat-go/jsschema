@@ -118,17 +118,20 @@ func extractInterface(r *interface{}, m map[string]interface{}, s string) error 
 	return nil
 }
 
-func extractInterfaceList(m map[string]interface{}, s string) ([]interface{}, error) {
+func extractInterfaceList(l *[]interface{}, m map[string]interface{}, s string) error {
 	if v, ok := m[s]; ok {
 		switch v.(type) {
 		case []interface{}:
-			return v.([]interface{}), nil
+			src := v.([]interface{})
+			*l = make([]interface{}, len(src))
+			copy(*l, src)
+			return nil
 		default:
-			return nil, ErrInvalidFieldValue{Name: s}
+			return ErrInvalidFieldValue{Name: s}
 		}
 	}
 
-	return nil, nil
+	return nil
 }
 
 func extractRegexp(m map[string]interface{}, s string) (*regexp.Regexp, error) {
@@ -358,7 +361,7 @@ func (s *Schema) extract(m map[string]interface{}) error {
 		return err
 	}
 
-	if s.Enum, err = extractInterfaceList(m, "enum"); err != nil {
+	if err = extractInterfaceList(&s.Enum, m, "enum"); err != nil {
 		return err
 	}
 
