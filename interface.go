@@ -119,7 +119,7 @@ type Schema struct {
 	parent          *Schema
 	cachedReference map[string]interface{}
 	schemaByID      map[string]*Schema
-	id              string             `json:"id,omitempty"`
+	ID              string             `json:"id,omitempty"`
 	Title           string             `json:"title,omitempty"`
 	Description     string             `json:"description,omitempty"`
 	Default         interface{}        `json:"default,omitempty"`
