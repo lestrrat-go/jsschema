@@ -2,6 +2,7 @@ package schema
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"math"
 	"net"
@@ -36,6 +37,104 @@ func Read(in io.Reader) (*Schema, error) {
 
 	s.applyParentSchema()
 	return s, nil
+}
+
+func (s Schema) IsEmpty() bool {
+	if s.Title != "" {
+		return false
+	}
+	if s.Description != "" {
+		return false
+	}
+	if s.Default != nil {
+		return false
+	}
+	if len(s.Type) > 0 {
+		return false
+	}
+	if s.SchemaRef != "" {
+		return false
+	}
+
+	if len(s.Definitions) > 0 {
+		return false
+	}
+	if s.Reference != "" {
+		return false
+	}
+	if s.Format != "" {
+		return false
+	}
+
+	if s.MultipleOf.Initialized {
+		return false
+	}
+	if s.Minimum.Initialized {
+		return false
+	}
+	if s.Maximum.Initialized {
+		return false
+	}
+	if s.ExclusiveMinimum.Initialized {
+		return false
+	}
+	if s.ExclusiveMaximum.Initialized {
+		return false
+	}
+	if s.MaxLength.Initialized {
+		return false
+	}
+	if s.MinLength.Initialized {
+		return false
+	}
+	if s.Pattern != nil {
+		return false
+	}
+
+	// ArrayValidations
+	//	AllowAdditionalItems bool
+	//	AdditionalItems      []*Schema
+	//	Items                []*Schema
+	//	minItems             integer
+	//	maxItems             integer
+
+	if s.UniqueItems.Initialized {
+		return false
+	}
+	if s.MaxProperties.Initialized {
+		return false
+	}
+	if s.MinProperties.Initialized {
+		return false
+	}
+	if s.Required != nil {
+		return false
+	}
+	if s.Properties != nil {
+		return false
+	}
+	if s.AdditionalProperties == nil || !s.AdditionalProperties.IsEmpty() {
+		return false
+	}
+	if len(s.PatternProperties) > 0 {
+		return false
+	}
+	if len(s.Enum) > 0 {
+		return false
+	}
+	if len(s.AllOf) > 0 {
+		return false
+	}
+	if len(s.AnyOf) > 0 {
+		return false
+	}
+	if len(s.OneOf) > 0 {
+		return false
+	}
+	if s.Not != nil {
+		return false
+	}
+	return true
 }
 
 func (s *Schema) setParent(v *Schema) {
@@ -258,6 +357,34 @@ func (s Schema) isPropRequired(pname string) bool {
 		}
 	}
 	return false
+}
+
+// getProps return all of the property names for this object.
+// XXX Map keys can be something other than strings, but
+// we can't really allow it?
+func getPropNames(rv reflect.Value) ([]string, error) {
+	var keys []string
+	switch rv.Kind() {
+	case reflect.Map:
+		vk := rv.MapKeys()
+		keys = make([]string, len(vk))
+		for i, v := range vk {
+			if v.Kind() != reflect.String {
+				return nil, errors.New("panic: can only handle maps with string keys")
+			}
+			keys[i] = v.String()
+		}
+	case reflect.Struct:
+		if keys = structinfo.JSONFieldsFromStruct(rv); keys == nil {
+			// Can't happen, because we check for reflect.Struct,
+			// but for completeness
+			return nil, errors.New("panic: can only handle structs")
+		}
+	default:
+		return nil, errors.New("cannot get property names from this value")
+	}
+
+	return keys, nil
 }
 
 func getProp(rv reflect.Value, pname string) reflect.Value {
@@ -489,7 +616,7 @@ func validateNumber(rv reflect.Value, def *Schema) (err error) {
 	}
 
 	if def.Minimum.Initialized {
-		if def.ExclusiveMinimum {
+		if def.ExclusiveMinimum.Bool() {
 			if f < def.Minimum.Val {
 				err = ErrMinimumValidationFailed{Num: f, Min: def.Minimum.Val, Exclusive: true}
 				return
@@ -503,7 +630,7 @@ func validateNumber(rv reflect.Value, def *Schema) (err error) {
 	}
 
 	if def.Maximum.Initialized {
-		if def.ExclusiveMaximum {
+		if def.ExclusiveMaximum.Bool() {
 			if f > def.Maximum.Val {
 				err = ErrMaximumValidationFailed{Num: f, Max: def.Maximum.Val, Exclusive: true}
 				return
@@ -531,6 +658,47 @@ func validateNumber(rv reflect.Value, def *Schema) (err error) {
 			return
 		}
 	}
+	return nil
+}
+
+func validateObject(rv reflect.Value, def *Schema) error {
+	names, err := getPropNames(rv)
+	if err != nil {
+		return err
+	}
+
+	// Make it into a map so we don't check it multiple times
+	namesMap := make(map[string]struct{})
+	for _, name := range names {
+		namesMap[name] = struct{}{}
+	}
+
+	for pname, pdef := range def.properties {
+		delete(namesMap, pname)
+		if err := validateProp(rv, pname, pdef, def.isPropRequired(pname)); err != nil {
+			return err
+		}
+	}
+
+	if pp := def.PatternProperties; len(pp) > 0 {
+		for pname := range namesMap {
+			for pat, pdef := range pp {
+				if pat.MatchString(pname) {
+					delete(namesMap, pname)
+					if err := validateProp(rv, pname, pdef, def.isPropRequired(pname)); err != nil {
+						return err
+					}
+				}
+			}
+		}
+	}
+
+	if def.AdditionalProperties == nil {
+		if len(namesMap) > 0 {
+			return ErrAdditionalProperties
+		}
+	}
+
 	return nil
 }
 
@@ -609,10 +777,8 @@ func validate(rv reflect.Value, def *Schema) (err error) {
 		if err = matchType(ObjectType, def.Type); err != nil {
 			return
 		}
-		for pname, pdef := range def.properties {
-			if err = validateProp(rv, pname, pdef, def.isPropRequired(pname)); err != nil {
-				return
-			}
+		if err = validateObject(rv, def); err != nil {
+			return
 		}
 	case reflect.String:
 		// Make sure string type is allowed here
@@ -703,7 +869,7 @@ func extractNumber(n *Number, m map[string]interface{}, s string) error {
 	return nil
 }
 
-func extractInt(n *integer, m map[string]interface{}, s string) error {
+func extractInt(n *Integer, m map[string]interface{}, s string) error {
 	v, ok := m[s]
 	if !ok {
 		return nil
@@ -720,10 +886,10 @@ func extractInt(n *integer, m map[string]interface{}, s string) error {
 	return nil
 }
 
-func extractBool(b *bool, m map[string]interface{}, s string, def bool) error {
+func extractBool(b *Bool, m map[string]interface{}, s string, def bool) error {
+	b.Default = def
 	v, ok := m[s]
 	if !ok {
-		*b = def
 		return nil
 	}
 
@@ -733,7 +899,8 @@ func extractBool(b *bool, m map[string]interface{}, s string, def bool) error {
 		return ErrInvalidFieldValue{Name: s}
 	}
 
-	*b = v.(bool)
+	b.Val = v.(bool)
+	b.Initialized = true
 	return nil
 }
 
@@ -895,6 +1062,39 @@ func extractSchemaMap(m map[string]interface{}, name string) (map[string]*Schema
 	return nil, nil
 }
 
+func extractRegexpToSchemaMap(m map[string]interface{}, name string) (map[*regexp.Regexp]*Schema, error) {
+	if v, ok := m[name]; ok {
+		switch v.(type) {
+		case map[string]interface{}:
+		default:
+			return nil, ErrInvalidFieldValue{Name: name}
+		}
+
+		r := make(map[*regexp.Regexp]*Schema)
+		for k, data := range v.(map[string]interface{}) {
+			// data better be a map
+			switch data.(type) {
+			case map[string]interface{}:
+			default:
+				return nil, ErrInvalidFieldValue{Name: name}
+			}
+			s := New()
+			if err := s.extract(data.(map[string]interface{})); err != nil {
+				return nil, err
+			}
+
+			rx, err := regexp.Compile(k)
+			if err != nil {
+				return nil, err
+			}
+
+			r[rx] = s
+		}
+		return r, nil
+	}
+	return nil, nil
+}
+
 func (s *Schema) UnmarshalJSON(data []byte) error {
 	m := map[string]interface{}{}
 	if err := json.Unmarshal(data, &m); err != nil {
@@ -1030,6 +1230,34 @@ func (s *Schema) extract(m map[string]interface{}) error {
 		return err
 	}
 
+	if _, ok := m["additionalProperties"]; !ok {
+		// doesn't exist. it's an empty schema
+		s.AdditionalProperties = &AdditionalProperties{}
+	} else {
+		var b Bool
+		if err = extractBool(&b, m, "additionalProperties", true); err == nil {
+			if b.Bool() {
+				s.AdditionalProperties = &AdditionalProperties{}
+			} else {
+			}
+		} else {
+			// Oh, it's not a boolean?
+			var apSchema *Schema
+			if apSchema, err = extractSchema(m, "additionalProperties"); err != nil {
+				return err
+			}
+			s.AdditionalProperties = &AdditionalProperties{apSchema}
+		}
+	}
+
+	if s.PatternProperties, err = extractRegexpToSchemaMap(m, "patternProperties"); err != nil {
+		return err
+	}
+
+	if s.properties, err = extractSchemaMap(m, "properties"); err != nil {
+		return err
+	}
+
 	if s.AllOf, err = extractSchemaList(m, "allOf"); err != nil {
 		return err
 	}
@@ -1089,11 +1317,8 @@ func placeStringList(m map[string]interface{}, name string, l []string) {
 	}
 }
 
-func placeBool(m map[string]interface{}, name string, value bool, def bool) {
-	if value == def { // no need to record default values
-		return
-	}
-	place(m, name, value)
+func placeBool(m map[string]interface{}, name string, value Bool) {
+	place(m, name, value.Bool())
 }
 
 func placeNumber(m map[string]interface{}, name string, n Number) {
@@ -1103,7 +1328,7 @@ func placeNumber(m map[string]interface{}, name string, n Number) {
 	place(m, name, n.Val)
 }
 
-func placeInteger(m map[string]interface{}, name string, n integer) {
+func placeInteger(m map[string]interface{}, name string, n Integer) {
 	if !n.Initialized {
 		return
 	}
@@ -1141,7 +1366,9 @@ func (s Schema) MarshalJSON() ([]byte, error) {
 	placeInteger(m, "minItems", s.minItems)
 	placeInteger(m, "maxProperties", s.MaxProperties)
 	placeInteger(m, "minProperties", s.MinProperties)
-	placeBool(m, "uniqueItems", s.UniqueItems, false)
+	if s.UniqueItems.Initialized {
+		placeBool(m, "uniqueItems", s.UniqueItems)
+	}
 	placeSchemaMap(m, "definitions", s.Definitions)
 
 	switch len(s.Items) {
@@ -1153,6 +1380,14 @@ func (s Schema) MarshalJSON() ([]byte, error) {
 	}
 
 	placeSchemaMap(m, "properties", s.properties)
+	if len(s.PatternProperties) > 0 {
+		rxm := make(map[string]*Schema)
+		for rx, rxs := range s.PatternProperties {
+			rxm[rx.String()] = rxs
+		}
+		placeSchemaMap(m, "patternProperties", rxm)
+	}
+
 	placeSchemaList(m, "allOf", s.AllOf)
 	placeSchemaList(m, "anyOf", s.AnyOf)
 	placeSchemaList(m, "oneOf", s.OneOf)
@@ -1163,9 +1398,22 @@ func (s Schema) MarshalJSON() ([]byte, error) {
 
 	placeString(m, "format", string(s.Format))
 	placeNumber(m, "minimum", s.Minimum)
-	placeBool(m, "exclusiveMinimum", s.ExclusiveMinimum, false)
+	if s.ExclusiveMinimum.Initialized {
+		placeBool(m, "exclusiveMinimum", s.ExclusiveMinimum)
+	}
 	placeNumber(m, "maximum", s.Maximum)
-	placeBool(m, "exclusiveMaximum", s.ExclusiveMaximum, false)
+	if s.ExclusiveMaximum.Initialized {
+		placeBool(m, "exclusiveMaximum", s.ExclusiveMaximum)
+	}
+
+	if ap := s.AdditionalProperties; ap != nil {
+		if ap.Schema != nil {
+			place(m, "additionalProperties", ap.Schema)
+		}
+	} else {
+		// additionalProperties: false
+		placeBool(m, "additionalProperties", Bool{Val: false, Initialized: true})
+	}
 
 	if s.MultipleOf.Val != 0 {
 		placeNumber(m, "multipleOf", s.MultipleOf)

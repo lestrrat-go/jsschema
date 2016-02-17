@@ -8,6 +8,7 @@ import (
 const MIMEType = "application/schema+json"
 
 var (
+	ErrAdditionalProperties       = errors.New("additional properties are not allowed")
 	ErrAnyOfValidationFailed      = errors.New("'anyOf' validation failed")
 	ErrOneOfValidationFailed      = errors.New("'oneOf' validation failed")
 	ErrIntegerValidationFailed    = errors.New("'integer' validation failed")
@@ -73,13 +74,14 @@ type Number struct {
 	Initialized bool
 }
 
-type integer struct {
+type Integer struct {
 	Val         int
 	Initialized bool
 }
 
 type Bool struct {
 	Val         bool
+	Default     bool
 	Initialized bool
 }
 
@@ -112,33 +114,37 @@ type Schema struct {
 	MultipleOf       Number `json:"multipleOf,omitempty"`
 	Minimum          Number `json:"minimum,omitempty"`
 	Maximum          Number `json:"maximum,omitempty"`
-	ExclusiveMinimum bool   `json:"exclusiveMinimum,omitempty"`
-	ExclusiveMaximum bool   `json:"exclusiveMaximum,omitempty"`
+	ExclusiveMinimum Bool   `json:"exclusiveMinimum,omitempty"`
+	ExclusiveMaximum Bool   `json:"exclusiveMaximum,omitempty"`
 
 	// StringValidation
-	MaxLength integer        `json:"maxLength,omitempty"`
-	MinLength integer        `json:"minLength,omitempty"`
+	MaxLength Integer        `json:"maxLength,omitempty"`
+	MinLength Integer        `json:"minLength,omitempty"`
 	Pattern   *regexp.Regexp `json:"pattern,omitempty"`
 
 	// ArrayValidations
 	AllowAdditionalItems bool
 	AdditionalItems      []*Schema
 	Items                []*Schema
-	minItems             integer
-	maxItems             integer
-	UniqueItems          bool
+	minItems             Integer
+	maxItems             Integer
+	UniqueItems          Bool
 
 	// ObjectValidations
-	MaxProperties        integer            `json:"maxProperties,omitempty"`
-	MinProperties        integer            `json:"minProperties,omitempty"`
-	Required             []string           `json:"required,omitempty"`
-	properties           map[string]*Schema `json:"properties,omitempty"`
-	AdditionalProperties bool               `json:"additionalProperties,omitempty"`
-	PatternProperties    *regexp.Regexp     `json:"patternProperties,omitempty"`
+	MaxProperties        Integer                    `json:"maxProperties,omitempty"`
+	MinProperties        Integer                    `json:"minProperties,omitempty"`
+	Required             []string                   `json:"required,omitempty"`
+	properties           map[string]*Schema         `json:"properties,omitempty"`
+	AdditionalProperties *AdditionalProperties      `json:"additionalProperties,omitempty"`
+	PatternProperties    map[*regexp.Regexp]*Schema `json:"patternProperties,omitempty"`
 
 	Enum  []interface{} `json:"enum,omitempty"`
 	AllOf []*Schema     `json:"allOf,omitempty"`
 	AnyOf []*Schema     `json:"anyOf,omitempty"`
 	OneOf []*Schema     `json:"oneOf,omitempty"`
 	Not   *Schema       `json:"not,omitempty"`
+}
+
+type AdditionalProperties struct {
+	*Schema
 }

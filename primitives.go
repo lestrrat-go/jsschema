@@ -83,3 +83,9 @@ func (ts *PrimitiveTypes) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func (b Bool) Bool() bool {
+	if b.Initialized {
+		return b.Val
+	}
+	return b.Default
+}

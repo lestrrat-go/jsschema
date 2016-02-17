@@ -34,6 +34,7 @@ func TestValidate(t *testing.T) {
 		"integer",
 		"not",
 		"numrange",
+	  "objectpatterns",
 		"oneof",
 		"strlen",
 		"strpattern",
