@@ -667,6 +667,26 @@ func validateObject(rv reflect.Value, def *Schema) error {
 		return err
 	}
 
+	if def.MinProperties.Initialized || def.MaxProperties.Initialized {
+		// Need to count... 
+		count := 0
+		for _, name := range names {
+			if pv := getProp(rv, name); pv != zeroval {
+				count++
+			}
+		}
+		if def.MinProperties.Initialized {
+			if v := def.MinProperties.Val; v > count {
+				return ErrMinPropertiesValidationFailed{Num: count, Min: v}
+			}
+		}
+		if def.MaxProperties.Initialized {
+			if v := def.MaxProperties.Val; v < count {
+				return ErrMaxPropertiesValidationFailed{Num: count, Max: v}
+			}
+		}
+	}
+
 	// Make it into a map so we don't check it multiple times
 	namesMap := make(map[string]struct{})
 	for _, name := range names {

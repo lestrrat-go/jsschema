@@ -22,6 +22,14 @@ func (e ErrMaxLengthValidationFailed) Error() string {
 	return fmt.Sprintf("required maximum length not met: %d > %d", e.Len, e.MaxLength)
 }
 
+func (e ErrMinPropertiesValidationFailed) Error() string {
+	return fmt.Sprintf("number of properties fewer than minimum number: %d < %d", e.Num, e.Min)
+}
+
+func (e ErrMaxPropertiesValidationFailed) Error() string {
+	return fmt.Sprintf("number of properties exceed maximum number: %d > %d", e.Num, e.Max)
+}
+
 func (e ErrPatternValidationFailed) Error() string {
 	return fmt.Sprintf("pattern did not match: '%s' does not match '%s'", e.Str, e.Pattern)
 }

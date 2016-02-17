@@ -55,6 +55,14 @@ type ErrMaxLengthValidationFailed struct {
 	Len       int
 	MaxLength int
 }
+type ErrMinPropertiesValidationFailed struct {
+	Num int
+	Min int
+}
+type ErrMaxPropertiesValidationFailed struct {
+	Num int
+	Max int
+}
 type ErrPatternValidationFailed struct {
 	Str     string
 	Pattern *regexp.Regexp
