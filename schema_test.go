@@ -35,6 +35,7 @@ func TestValidate(t *testing.T) {
 		"not",
 		"numrange",
 		"objectpatterns",
+		"objectpropdepend",
 		"objectpropsize",
 		"objectproprequired",
 		"oneof",

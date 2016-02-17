@@ -425,13 +425,15 @@ func matchType(t PrimitiveType, list PrimitiveTypes) error {
 func validateProp(c reflect.Value, pname string, def *Schema, required bool) (err error) {
 	if pdebug.Enabled {
 		g := pdebug.IPrintf("START validateProp '%s'", pname)
-		defer g.IRelease("END validateProp '%s'", pname)
+		defer func() {
+			if err == nil {
+				g.IRelease("END validateProp '%s' (PASS)", pname)
+			} else {
+				g.IRelease("END validateProp '%s': error %s", pname, err)
+			}
+		}()
 	}
 
-	def, err = def.resolveCurrentSchemaReference()
-	if err != nil {
-		return
-	}
 	pv := getProp(c, pname)
 	if pv.Kind() == reflect.Interface {
 		pv = pv.Elem()
@@ -448,6 +450,16 @@ func validateProp(c reflect.Value, pname string, def *Schema, required bool) (er
 		return
 	}
 
+	// It's totally ok to have use an empty schema here, because
+	// we might just might be checking that the property exists
+	if def == nil {
+		return nil
+	}
+
+	def, err = def.resolveCurrentSchemaReference()
+	if err != nil {
+		return
+	}
 	if err = validate(pv, def); err != nil {
 		return
 	}
@@ -710,6 +722,40 @@ func validateObject(rv reflect.Value, def *Schema) error {
 					}
 				}
 			}
+		}
+	}
+
+	for pname, pdef := range def.Dependencies {
+		pv := getProp(rv, pname)
+		if pv == zeroval {
+			continue
+		}
+
+		if pdebug.Enabled {
+			pdebug.Printf("Property %s has dependencies!", pname)
+		}
+
+		delete(namesMap, pname)
+		switch pdef.(type) {
+		case []interface{}:
+			for _, depname := range pdef.([]interface{}) {
+				switch depname.(type) {
+				case string:
+				default:
+					return ErrInvalidFieldValue{Name: pname}
+				}
+				if err := validateProp(rv, depname.(string), nil, true); err != nil {
+					return err
+				}
+			}
+		case map[string]interface{}:
+			for depname, depdef := range pdef.(map[string]*Schema) {
+				if err := validateProp(rv, depname, depdef, true); err != nil {
+					return err
+				}
+			}
+		default:
+			return errors.New("invalid dependency type")
 		}
 	}
 
@@ -1115,6 +1161,51 @@ func extractRegexpToSchemaMap(m map[string]interface{}, name string) (map[*regex
 	return nil, nil
 }
 
+func extractDependecies(res *DependencyMap, m map[string]interface{}, name string) error {
+	v, ok := m[name]
+	if !ok {
+		return nil
+	}
+
+	switch v.(type) {
+	case map[string]interface{}:
+	default:
+		return ErrInvalidFieldValue{Name: name}
+	}
+
+	m = v.(map[string]interface{})
+	if len(m) == 0 {
+		return nil
+	}
+
+	deps := DependencyMap{}
+	for k, p := range m {
+		switch p.(type) {
+		case []interface{}:
+			deps[k] = p
+		case map[string]interface{}:
+			r := make(map[string]*Schema)
+			for k, data := range p.(map[string]interface{}) {
+				// data better be a map
+				switch data.(type) {
+				case map[string]interface{}:
+				default:
+					return ErrInvalidFieldValue{Name: k}
+				}
+				s := New()
+				if err := s.extract(data.(map[string]interface{})); err != nil {
+					return err
+				}
+				r[k] = s
+			}
+			deps[k] = r
+		}
+	}
+
+	*res = deps
+	return nil
+}
+
 func (s *Schema) UnmarshalJSON(data []byte) error {
 	m := map[string]interface{}{}
 	if err := json.Unmarshal(data, &m); err != nil {
@@ -1247,6 +1338,10 @@ func (s *Schema) extract(m map[string]interface{}) error {
 	}
 
 	if s.properties, err = extractSchemaMap(m, "properties"); err != nil {
+		return err
+	}
+
+	if err = extractDependecies(&s.Dependencies, m, "dependencies"); err != nil {
 		return err
 	}
 
@@ -1441,6 +1536,10 @@ func (s Schema) MarshalJSON() ([]byte, error) {
 
 	if v := s.Not; v != nil {
 		place(m, "not", v)
+	}
+
+	if v := s.Dependencies; v != nil {
+		place(m, "dependencies", v)
 	}
 
 	return json.Marshal(m)

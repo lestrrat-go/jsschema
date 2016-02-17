@@ -142,6 +142,7 @@ type Schema struct {
 	MaxProperties        Integer                    `json:"maxProperties,omitempty"`
 	MinProperties        Integer                    `json:"minProperties,omitempty"`
 	Required             []string                   `json:"required,omitempty"`
+	Dependencies         DependencyMap              `json:"dependencies,omitempty"`
 	properties           map[string]*Schema         `json:"properties,omitempty"`
 	AdditionalProperties *AdditionalProperties      `json:"additionalProperties,omitempty"`
 	PatternProperties    map[*regexp.Regexp]*Schema `json:"patternProperties,omitempty"`
@@ -156,3 +157,5 @@ type Schema struct {
 type AdditionalProperties struct {
 	*Schema
 }
+
+type DependencyMap map[string]interface{}
