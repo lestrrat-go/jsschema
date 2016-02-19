@@ -10,20 +10,33 @@ import (
 	"net/url"
 	"os"
 	"reflect"
+	"strings"
 	"time"
 
-	"github.com/lestrrat/go-jspointer"
+	"github.com/lestrrat/go-jsref"
+	"github.com/lestrrat/go-jsref/provider"
 	"github.com/lestrrat/go-pdebug"
 	"github.com/lestrrat/go-structinfo"
 )
 
 // This is used to check against result of reflect.MapIndex
 var zeroval = reflect.Value{}
+var _schema *Schema
+
+func init() {
+	buildJSSchema()
+}
 
 func New() *Schema {
+	resolver := jsref.New()
+
+	mp := provider.NewMap()
+	mp.Set(SchemaURL, _schema)
+	resolver.AddProvider(mp)
+
 	s := &Schema{
-		cachedReference: make(map[string]interface{}),
-		schemaByID:      make(map[string]*Schema),
+		schemaByID: make(map[string]*Schema),
+		resolver:   resolver,
 	}
 	return s
 }
@@ -185,60 +198,24 @@ func (s Schema) ResolveURL(v string) (u *url.URL, err error) {
 	return u, nil
 }
 
-func (s *Schema) ResolveReference(v string) (r interface{}, err error) {
-	if pdebug.Enabled {
-		g := pdebug.IPrintf("START Schema.ResolveReference '%s'", v)
-		defer func() {
-			if err != nil {
-				g.IRelease("END Schema.ResolveReference '%s': error %s", v, err)
-			} else {
-				g.IRelease("END Schema.ResolveReference '%s'", v)
-			}
-		}()
-	}
-	u, err := s.ResolveURL(v)
-	if err != nil {
-		return nil, err
-	}
-
-	var ok bool
-	root := s.Root()
-	r, ok = root.cachedReference[u.String()]
-	if ok {
-		pdebug.Printf("s.ResolveReference: Cache HIT for '%s'", u)
-		return
-	}
-
-	var p *jspointer.JSPointer
-	p, err = jspointer.New(u.Fragment)
-	if err != nil {
-		return
-	}
-
-	var t *Schema
-	t, err = s.ResolveID(s.Scope())
-	if err != nil {
-		return
-	}
-
-	r, err = p.Get(t)
-	if err != nil {
-		return nil, err
-	}
-	s.cachedReference[u.String()] = r
-
-	if pdebug.Enabled {
-		pdebug.Printf("s.ResolveReference: Resolved %s (%s)", v, u.Fragment)
-	}
-	return
-}
-
 // Resolve the current schema reference, if '$ref' exists
-func (s *Schema) resolveCurrentSchemaReference() (*Schema, error) {
+func resolveSchemaReference(s *Schema) (res *Schema, err error) {
 	if s.Reference == "" {
 		return s, nil
 	}
-	thing, err := s.ResolveReference(s.Reference)
+
+	if pdebug.Enabled {
+		g := pdebug.IPrintf("START resolveSchemaReference (%s)", s.Reference)
+		defer func() {
+			if err != nil {
+				g.IRelease("END resolveSchemaReference (%s): %s", s.Reference, err)
+			} else {
+				g.IRelease("END resolveSchemaReference (%s)", s.Reference)
+			}
+		}()
+	}
+
+	thing, err := s.resolver.Resolve(s.Root(), s.Reference)
 	if err != nil {
 		return nil, ErrInvalidReference{Reference: s.Reference, Message: err.Error()}
 	}
@@ -325,7 +302,18 @@ func getProp(rv reflect.Value, pname string) reflect.Value {
 	}
 }
 
-func matchType(t PrimitiveType, list PrimitiveTypes) error {
+func matchType(t PrimitiveType, list PrimitiveTypes) (err error) {
+	if pdebug.Enabled {
+		g := pdebug.IPrintf("START matchType '%s'", t)
+		defer func() {
+			if err == nil {
+				g.IRelease("END matchType '%s' (PASS)", t)
+			} else {
+				g.IRelease("END matchType '%s': error %s", t, err)
+			}
+		}()
+	}
+
 	if len(list) == 0 {
 		return nil
 	}
@@ -350,6 +338,10 @@ func validateProp(c reflect.Value, pname string, def *Schema, required bool) (er
 			if err == nil {
 				g.IRelease("END validateProp '%s' (PASS)", pname)
 			} else {
+				buf, _ := json.MarshalIndent(c.Interface(), "", "  ")
+				pdebug.Printf("%s", buf)
+				buf, _ = json.MarshalIndent(def, "", "  ")
+				pdebug.Printf("%s", buf)
 				g.IRelease("END validateProp '%s': error %s", pname, err)
 			}
 		}()
@@ -381,7 +373,7 @@ func validateProp(c reflect.Value, pname string, def *Schema, required bool) (er
 		return nil
 	}
 
-	def, err = def.resolveCurrentSchemaReference()
+	def, err = resolveSchemaReference(def)
 	if err != nil {
 		return
 	}
@@ -704,6 +696,8 @@ func validateObject(rv reflect.Value, def *Schema) error {
 		return err
 	}
 
+
+
 	if def.MinProperties.Initialized || def.MaxProperties.Initialized {
 		// Need to count...
 		count := 0
@@ -811,7 +805,7 @@ func validate(rv reflect.Value, def *Schema) (err error) {
 		}()
 	}
 
-	def, err = def.resolveCurrentSchemaReference()
+	def, err = resolveSchemaReference(def)
 	if err != nil {
 		return
 	}
@@ -950,4 +944,165 @@ func (s Schema) Scope() string {
 	}
 
 	return s.parent.Scope()
+}
+
+func buildJSSchema() {
+	const src = `{
+  "id": "http://json-schema.org/draft-04/schema#",
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "description": "Core schema meta-schema",
+  "definitions": {
+    "schemaArray": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#" }
+    },
+    "positiveInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "positiveIntegerDefault0": {
+      "allOf": [ { "$ref": "#/definitions/positiveInteger" }, { "default": 0 } ]
+    },
+    "simpleTypes": {
+      "enum": [ "array", "boolean", "integer", "null", "number", "object", "string" ]
+    },
+    "stringArray": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "uniqueItems": true
+    }
+  },
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uri"
+    },
+    "$schema": {
+      "type": "string",
+      "format": "uri"
+    },
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "default": {},
+    "multipleOf": {
+      "type": "number",
+      "minimum": 0,
+      "exclusiveMinimum": true
+    },
+    "maximum": {
+      "type": "number"
+    },
+    "exclusiveMaximum": {
+      "type": "boolean",
+      "default": false
+    },
+    "minimum": {
+      "type": "number"
+    },
+    "exclusiveMinimum": {
+      "type": "boolean",
+      "default": false
+    },
+    "maxLength": { "$ref": "#/definitions/positiveInteger" },
+    "minLength": { "$ref": "#/definitions/positiveIntegerDefault0" },
+    "pattern": {
+      "type": "string",
+      "format": "regex"
+    },
+    "additionalItems": {
+      "anyOf": [
+        { "type": "boolean" },
+        { "$ref": "#" }
+      ],
+      "default": {}
+    },
+    "items": {
+      "anyOf": [
+        { "$ref": "#" },
+        { "$ref": "#/definitions/schemaArray" }
+      ],
+      "default": {}
+    },
+    "maxItems": { "$ref": "#/definitions/positiveInteger" },
+    "minItems": { "$ref": "#/definitions/positiveIntegerDefault0" },
+    "uniqueItems": {
+      "type": "boolean",
+      "default": false
+    },
+    "maxProperties": { "$ref": "#/definitions/positiveInteger" },
+    "minProperties": { "$ref": "#/definitions/positiveIntegerDefault0" },
+    "required": { "$ref": "#/definitions/stringArray" },
+    "additionalProperties": {
+      "anyOf": [
+        { "type": "boolean" },
+        { "$ref": "#" }
+      ],
+      "default": {}
+    },
+    "definitions": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#" },
+      "default": {}
+    },
+    "properties": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#" },
+      "default": {}
+    },
+    "patternProperties": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#" },
+      "default": {}
+    },
+    "dependencies": {
+      "type": "object",
+      "additionalProperties": {
+        "anyOf": [
+          { "$ref": "#" },
+          { "$ref": "#/definitions/stringArray" }
+        ]
+      }
+    },
+    "enum": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "type": {
+      "anyOf": [
+        { "$ref": "#/definitions/simpleTypes" },
+        {
+          "type": "array",
+          "items": { "$ref": "#/definitions/simpleTypes" },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      ]
+    },
+    "allOf": { "$ref": "#/definitions/schemaArray" },
+    "anyOf": { "$ref": "#/definitions/schemaArray" },
+    "oneOf": { "$ref": "#/definitions/schemaArray" },
+    "not": { "$ref": "#" }
+  },
+  "dependencies": {
+    "exclusiveMaximum": [ "maximum" ],
+    "exclusiveMinimum": [ "minimum" ]
+  },
+  "default": {}
+}`
+	s, err := Read(strings.NewReader(src))
+	if err != nil {
+		// We regret to inform you that if we can't parse this
+		// schema, then we have a real real real problem, so we're
+		// going to panic
+		panic("failed to parse main JSON Schema schema: " + err.Error())
+	}
+	_schema = s
 }

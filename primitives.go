@@ -40,7 +40,7 @@ func primitiveFromString(s string) (t PrimitiveType, err error) {
 	return
 }
 
-func (t PrimitiveType) MarshalJSON() ([]byte, error) {
+func (t PrimitiveType) String() string {
 	var v string
 	switch t {
 	case NullType:
@@ -58,9 +58,18 @@ func (t PrimitiveType) MarshalJSON() ([]byte, error) {
 	case NumberType:
 		v = "number"
 	default:
+		v = "<invalid>"
+	}
+	return v
+}
+
+func (t PrimitiveType) MarshalJSON() ([]byte, error) {
+	switch t {
+	case NullType, IntegerType, StringType, ObjectType, ArrayType, BooleanType, NumberType:
+		return json.Marshal(t.String())
+	default:
 		return nil, errors.New("unknown primitive type")
 	}
-	return json.Marshal(v)
 }
 
 func (ts *PrimitiveTypes) UnmarshalJSON(data []byte) error {
