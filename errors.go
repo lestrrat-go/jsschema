@@ -2,8 +2,12 @@ package schema
 
 import "fmt"
 
+func (e ErrExtract) Error() string {
+	return fmt.Sprintf("failed to extract '%s' from JSON: %s", e.Field, e.Err)
+}
+
 func (e ErrInvalidFieldValue) Error() string {
-	return fmt.Sprintf("invalid value for field %s", e.Name)
+	return fmt.Sprintf("invalid value for field %s (%s)", e.Name, e.Kind)
 }
 
 func (e ErrInvalidReference) Error() string {

@@ -11,10 +11,13 @@ import (
 )
 
 func TestReadSchema(t *testing.T) {
-	file := filepath.Join("test", "schema.json")
-	_, err := readSchema(file)
-	if !assert.NoError(t, err, "readSchema(%s) should succeed", file) {
-		return
+	files := []string{"schema.json", "qiita.json"}
+	for _, f := range files {
+		file := filepath.Join("test", f)
+		_, err := readSchema(file)
+		if !assert.NoError(t, err, "readSchema(%s) should succeed", file) {
+			return
+		}
 	}
 }
 

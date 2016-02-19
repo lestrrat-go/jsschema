@@ -37,8 +37,14 @@ type Format string
 type ErrRequiredField struct {
 	Name string
 }
+type ErrExtract struct {
+	Field string
+	Err   error
+}
+
 type ErrInvalidFieldValue struct {
 	Name string
+	Kind string
 }
 type ErrInvalidReference struct {
 	Reference string

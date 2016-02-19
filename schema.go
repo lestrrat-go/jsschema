@@ -696,8 +696,6 @@ func validateObject(rv reflect.Value, def *Schema) error {
 		return err
 	}
 
-
-
 	if def.MinProperties.Initialized || def.MaxProperties.Initialized {
 		// Need to count...
 		count := 0

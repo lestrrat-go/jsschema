@@ -2,6 +2,7 @@ package schema
 
 import (
 	"encoding/json"
+	"reflect"
 	"regexp"
 )
 
@@ -343,39 +344,39 @@ func (s *Schema) extract(m map[string]interface{}) error {
 	var err error
 
 	if err = extractString(&s.ID, m, "id"); err != nil {
-		return err
+		return ErrExtract{Field: "id", Err: err}
 	}
 
 	if err = extractString(&s.Title, m, "title"); err != nil {
-		return err
+		return ErrExtract{Field: "title", Err: err}
 	}
 
 	if err = extractString(&s.Description, m, "description"); err != nil {
-		return err
+		return ErrExtract{Field: "description", Err: err}
 	}
 
 	if err = extractStringList(&s.Required, m, "required"); err != nil {
-		return err
+		return ErrExtract{Field: "required", Err: err}
 	}
 
 	if err = extractJSPointer(&s.SchemaRef, m, "$schema"); err != nil {
-		return err
+		return ErrExtract{Field: "$schema", Err: err}
 	}
 
 	if err = extractJSPointer(&s.Reference, m, "$ref"); err != nil {
-		return err
+		return ErrExtract{Field: "$ref", Err: err}
 	}
 
 	if err = extractFormat(&s.Format, m, "format"); err != nil {
-		return err
+		return ErrExtract{Field: "format", Err: err}
 	}
 
 	if err = extractInterfaceList(&s.Enum, m, "enum"); err != nil {
-		return err
+		return ErrExtract{Field: "enum", Err: err}
 	}
 
 	if err = extractInterface(&s.Default, m, "default"); err != nil {
-		return err
+		return ErrExtract{Field: "default", Err: err}
 	}
 
 	if v, ok := m["type"]; ok {
@@ -383,90 +384,101 @@ func (s *Schema) extract(m map[string]interface{}) error {
 		case string:
 			t, err := primitiveFromString(v.(string))
 			if err != nil {
-				return err
+				return ErrExtract{Field: "type", Err: err}
 			}
 			s.Type = PrimitiveTypes{t}
-		case []string:
-			l := v.([]string)
+		case []interface{}:
+			l := v.([]interface{})
 			s.Type = make(PrimitiveTypes, len(l))
 			for i, ts := range l {
-				t, err := primitiveFromString(ts)
+				switch ts.(type) {
+				case string:
+				default:
+					return ErrExtract{
+						Field: "type",
+						Err: ErrInvalidFieldValue{
+							Name: "type",
+							Kind: reflect.ValueOf(ts).Kind().String(),
+						},
+					}
+				}
+				t, err := primitiveFromString(ts.(string))
 				if err != nil {
 					return err
 				}
 				s.Type[i] = t
 			}
 		default:
-			return ErrInvalidFieldValue{Name: "type"}
+			return ErrExtract{Field: "type", Err: ErrInvalidFieldValue{Name: "type", Kind: reflect.ValueOf(v).Kind().String()}}
 		}
 	}
 
 	if s.Definitions, err = extractSchemaMap(m, "definitions"); err != nil {
-		return err
+		return ErrExtract{Field: "definitions", Err: err}
 	}
 
 	if err = extractItems(&s.Items, m, "items"); err != nil {
-		return err
+		return ErrExtract{Field: "items", Err: err}
 	}
 
 	if err = extractRegexp(&s.Pattern, m, "pattern"); err != nil {
-		return err
+		return ErrExtract{Field: "pattern", Err: err}
 	}
 
 	if extractInt(&s.MinLength, m, "minLength"); err != nil {
-		return err
+		return ErrExtract{Field: "minLength", Err: err}
 	}
 
 	if extractInt(&s.MaxLength, m, "maxLength"); err != nil {
-		return err
+		return ErrExtract{Field: "maxLength", Err: err}
 	}
 
 	if extractInt(&s.MinItems, m, "minItems"); err != nil {
-		return err
+		return ErrExtract{Field: "minItems", Err: err}
 	}
 
 	if extractInt(&s.MaxItems, m, "maxItems"); err != nil {
-		return err
+		return ErrExtract{Field: "maxItems", Err: err}
 	}
 
 	if err = extractBool(&s.UniqueItems, m, "uniqueItems", false); err != nil {
-		return err
+		return ErrExtract{Field: "uniqueItems", Err: err}
 	}
 
 	if err = extractInt(&s.MaxProperties, m, "maxProperties"); err != nil {
-		return err
+		return ErrExtract{Field: "maxProperties", Err: err}
 	}
 
 	if err = extractInt(&s.MinProperties, m, "minProperties"); err != nil {
-		return err
+		return ErrExtract{Field: "minProperties", Err: err}
 	}
 
 	if err = extractNumber(&s.Minimum, m, "minimum"); err != nil {
-		return err
+		return ErrExtract{Field: "minimum", Err: err}
 	}
 
 	if err = extractBool(&s.ExclusiveMinimum, m, "exclusiveminimum", false); err != nil {
-		return err
+		return ErrExtract{Field: "exclusiveMinimum", Err: err}
 	}
 
 	if err = extractNumber(&s.Maximum, m, "maximum"); err != nil {
-		return err
+		return ErrExtract{Field: "maximum", Err: err}
 	}
 
 	if err = extractBool(&s.ExclusiveMaximum, m, "exclusivemaximum", false); err != nil {
-		return err
+		return ErrExtract{Field: "exclusiveMaximum", Err: err}
 	}
 
 	if err = extractNumber(&s.MultipleOf, m, "multipleOf"); err != nil {
-		return err
+		return ErrExtract{Field: "multipleOf", Err: err}
 	}
 
 	if s.Properties, err = extractSchemaMap(m, "properties"); err != nil {
-		return err
+		return ErrExtract{Field: "properties", Err: err}
 	}
 
 	if err = extractDependecies(&s.Dependencies, m, "dependencies"); err != nil {
-		return err
+		return ErrExtract{Field: "dependencies", Err: err}
 	}
 
 	if _, ok := m["additionalItems"]; !ok {
@@ -482,7 +494,7 @@ func (s *Schema) extract(m map[string]interface{}) error {
 			// Oh, it's not a boolean?
 			var apSchema *Schema
 			if err = extractSchema(&apSchema, m, "additionalItems"); err != nil {
-				return err
+				return ErrExtract{Field: "additionalItems", Err: err}
 			}
 			s.AdditionalItems = &AdditionalItems{apSchema}
 		}
@@ -501,34 +513,30 @@ func (s *Schema) extract(m map[string]interface{}) error {
 			// Oh, it's not a boolean?
 			var apSchema *Schema
 			if err = extractSchema(&apSchema, m, "additionalProperties"); err != nil {
-				return err
+				return ErrExtract{Field: "additionalProperties", Err: err}
 			}
 			s.AdditionalProperties = &AdditionalProperties{apSchema}
 		}
 	}
 
 	if s.PatternProperties, err = extractRegexpToSchemaMap(m, "patternProperties"); err != nil {
-		return err
-	}
-
-	if s.Properties, err = extractSchemaMap(m, "properties"); err != nil {
-		return err
+		return ErrExtract{Field: "patternProperties", Err: err}
 	}
 
 	if err = extractSchemaList(&s.AllOf, m, "allOf"); err != nil {
-		return err
+		return ErrExtract{Field: "allOf", Err: err}
 	}
 
 	if err = extractSchemaList(&s.AnyOf, m, "anyOf"); err != nil {
-		return err
+		return ErrExtract{Field: "anyOf", Err: err}
 	}
 
 	if err = extractSchemaList(&s.OneOf, m, "oneOf"); err != nil {
-		return err
+		return ErrExtract{Field: "oneOf", Err: err}
 	}
 
 	if err = extractSchema(&s.Not, m, "not"); err != nil {
-		return err
+		return ErrExtract{Field: "not", Err: err}
 	}
 
 	s.applyParentSchema()
