@@ -18,8 +18,20 @@ func usage() {
 	fmt.Printf("jsschema [schema file] [target file]\n")
 }
 
+func dumpJSON(v interface{}) error {
+	buf, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		log.Printf("failed to encode to JSON: %s", err)
+		return err
+	}
+
+	os.Stdout.Write(buf)
+	os.Stdout.Write([]byte{'\n'})
+	return nil
+}
+
 func _main() int {
-	if len(os.Args) < 3 {
+	if len(os.Args) < 2 {
 		usage()
 		return 1
 	}
@@ -35,6 +47,14 @@ func _main() int {
 	if err != nil {
 		log.Printf("failed to read schema: %s", err)
 		return 1
+	}
+
+	if err := dumpJSON(s); err != nil {
+		return 1
+	}
+
+	if len(os.Args) < 3 {
+		return 0
 	}
 
 	f, err := os.Open(os.Args[2])
@@ -61,14 +81,9 @@ func _main() int {
 		return 1
 	}
 
-	buf, err := json.MarshalIndent(v, "", "  ")
-	if err != nil {
-		log.Printf("failed to encode data: %s", err)
+	if err := dumpJSON(v); err != nil {
 		return 1
 	}
-
-	os.Stdout.Write(buf)
-	os.Stdout.Write([]byte{'\n'})
 
 	return 0
 }
