@@ -8,6 +8,7 @@ import (
 )
 
 const SchemaURL = `http://json-schema.org/draft-04/schema`
+const HyperSchemaURL = `http://json-schema.org/draft-03/hyper-schema`
 
 const MIMEType = "application/schema+json"
 

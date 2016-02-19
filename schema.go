@@ -21,24 +21,30 @@ import (
 
 // This is used to check against result of reflect.MapIndex
 var zeroval = reflect.Value{}
-var _schema *Schema
+var _schema Schema
+var _hyperSchema Schema
 
 func init() {
 	buildJSSchema()
+	buildHyperSchema()
 }
 
 func New() *Schema {
+	s := Schema{}
+	s.initialize()
+	return &s
+}
+
+func (s *Schema) initialize() {
 	resolver := jsref.New()
 
 	mp := provider.NewMap()
-	mp.Set(SchemaURL, _schema)
+	mp.Set(SchemaURL, &_schema)
+	mp.Set(HyperSchemaURL, &_hyperSchema)
 	resolver.AddProvider(mp)
 
-	s := &Schema{
-		schemaByID: make(map[string]*Schema),
-		resolver:   resolver,
-	}
-	return s
+	s.schemaByID = make(map[string]*Schema)
+	s.resolver = resolver
 }
 
 func ReadFile(f string) (*Schema, error) {
@@ -52,13 +58,19 @@ func ReadFile(f string) (*Schema, error) {
 
 func Read(in io.Reader) (*Schema, error) {
 	s := New()
-	dec := json.NewDecoder(in)
-	if err := dec.Decode(s); err != nil {
+	if err := s.decode(in); err != nil {
 		return nil, err
 	}
-
-	s.applyParentSchema()
 	return s, nil
+}
+
+func (s *Schema) decode(in io.Reader) error {
+	dec := json.NewDecoder(in)
+	if err := dec.Decode(s); err != nil {
+		return err
+	}
+	s.applyParentSchema()
+	return nil
 }
 
 func (s *Schema) setParent(v *Schema) {
@@ -1095,12 +1107,188 @@ func buildJSSchema() {
   },
   "default": {}
 }`
-	s, err := Read(strings.NewReader(src))
-	if err != nil {
+	if err := _schema.decode(strings.NewReader(src)); err != nil {
 		// We regret to inform you that if we can't parse this
 		// schema, then we have a real real real problem, so we're
 		// going to panic
 		panic("failed to parse main JSON Schema schema: " + err.Error())
 	}
-	_schema = s
+}
+
+func buildHyperSchema() {
+	const src = `{
+  "$schema": "http://json-schema.org/draft-04/hyper-schema#",
+  "id": "http://json-schema.org/draft-04/hyper-schema#",
+  "title": "JSON Hyper-Schema",
+  "allOf": [
+    {
+      "$ref": "http://json-schema.org/draft-04/schema#"
+    }
+  ],
+  "properties": {
+    "additionalItems": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "$ref": "#"
+        }
+      ]
+    },
+    "additionalProperties": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "$ref": "#"
+        }
+      ]
+    },
+    "dependencies": {
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "$ref": "#"
+          },
+          {
+            "type": "array"
+          }
+        ]
+      }
+    },
+    "items": {
+      "anyOf": [
+        {
+          "$ref": "#"
+        },
+        {
+          "$ref": "#/definitions/schemaArray"
+        }
+      ]
+    },
+    "definitions": {
+      "additionalProperties": {
+        "$ref": "#"
+      }
+    },
+    "patternProperties": {
+      "additionalProperties": {
+        "$ref": "#"
+      }
+    },
+    "properties": {
+      "additionalProperties": {
+        "$ref": "#"
+      }
+    },
+    "allOf": {
+      "$ref": "#/definitions/schemaArray"
+    },
+    "anyOf": {
+      "$ref": "#/definitions/schemaArray"
+    },
+    "oneOf": {
+      "$ref": "#/definitions/schemaArray"
+    },
+    "not": {
+      "$ref": "#"
+    },
+    "links": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/linkDescription"
+      }
+    },
+    "fragmentResolution": {
+      "type": "string"
+    },
+    "media": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "description": "A media type, as described in RFC 2046",
+          "type": "string"
+        },
+        "binaryEncoding": {
+          "description": "A content encoding scheme, as described in RFC 2045",
+          "type": "string"
+        }
+      }
+    },
+    "pathStart": {
+      "description": "Instances' URIs must start with this value for this schema to apply to them",
+      "type": "string",
+      "format": "uri"
+    }
+  },
+  "definitions": {
+    "schemaArray": {
+      "type": "array",
+      "items": {
+        "$ref": "#"
+      }
+    },
+    "linkDescription": {
+      "title": "Link Description Object",
+      "type": "object",
+      "required": [
+        "href",
+        "rel"
+      ],
+      "properties": {
+        "href": {
+          "description": "a URI template, as defined by RFC 6570, with the addition of the $, ( and ) characters for pre-processing",
+          "type": "string"
+        },
+        "rel": {
+          "description": "relation to the target resource of the link",
+          "type": "string"
+        },
+        "title": {
+          "description": "a title for the link",
+          "type": "string"
+        },
+        "targetSchema": {
+          "description": "JSON Schema describing the link target",
+          "$ref": "#"
+        },
+        "mediaType": {
+          "description": "media type (as defined by RFC 2046) describing the link target",
+          "type": "string"
+        },
+        "method": {
+          "description": "method for requesting the target of the link (e.g. for HTTP this might be \"GET\" or \"DELETE\")",
+          "type": "string"
+        },
+        "encType": {
+          "description": "The media type in which to submit data along with the request",
+          "type": "string",
+          "default": "application/json"
+        },
+        "schema": {
+          "description": "Schema describing the data to submit along with the request",
+          "$ref": "#"
+        }
+      }
+    }
+  },
+  "links": [
+    {
+      "rel": "self",
+      "href": "{+id}"
+    },
+    {
+      "rel": "full",
+      "href": "{+($ref)}"
+    }
+  ]
+}`
+	if err := _hyperSchema.decode(strings.NewReader(src)); err != nil {
+		// We regret to inform you that if we can't parse this
+		// schema, then we have a real real real problem, so we're
+		// going to panic
+		panic("failed to parse Hyper JSON Schema schema: " + err.Error())
+	}
 }
