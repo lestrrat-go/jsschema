@@ -385,10 +385,6 @@ func validateProp(c reflect.Value, pname string, def *Schema, required bool) (er
 		return nil
 	}
 
-	def, err = resolveSchemaReference(def)
-	if err != nil {
-		return
-	}
 	if err = validate(pv, def); err != nil {
 		return
 	}
@@ -815,11 +811,6 @@ func validate(rv reflect.Value, def *Schema) (err error) {
 		}()
 	}
 
-	def, err = resolveSchemaReference(def)
-	if err != nil {
-		return
-	}
-
 	switch {
 	case def.Not != nil:
 		if pdebug.Enabled {
@@ -871,6 +862,11 @@ func validate(rv reflect.Value, def *Schema) (err error) {
 			err = ErrOneOfValidationFailed
 			return
 		}
+	}
+
+	def, err = resolveSchemaReference(def)
+	if err != nil {
+		return
 	}
 
 	switch rv.Kind() {
