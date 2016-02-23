@@ -457,7 +457,7 @@ func (s *Schema) extract(m map[string]interface{}) error {
 		return ErrExtract{Field: "minimum", Err: err}
 	}
 
-	if err = extractBool(&s.ExclusiveMinimum, m, "exclusiveminimum", false); err != nil {
+	if err = extractBool(&s.ExclusiveMinimum, m, "exclusiveMinimum", false); err != nil {
 		return ErrExtract{Field: "exclusiveMinimum", Err: err}
 	}
 
@@ -465,7 +465,7 @@ func (s *Schema) extract(m map[string]interface{}) error {
 		return ErrExtract{Field: "maximum", Err: err}
 	}
 
-	if err = extractBool(&s.ExclusiveMaximum, m, "exclusivemaximum", false); err != nil {
+	if err = extractBool(&s.ExclusiveMaximum, m, "exclusiveMaximum", false); err != nil {
 		return ErrExtract{Field: "exclusiveMaximum", Err: err}
 	}
 
