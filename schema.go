@@ -260,7 +260,7 @@ func (s Schema) Validate(v interface{}) error {
 	return nil
 }
 
-func (s Schema) isPropRequired(pname string) bool {
+func (s Schema) IsPropRequired(pname string) bool {
 	for _, name := range s.Required {
 		if name == pname {
 			return true
@@ -732,7 +732,7 @@ func validateObject(rv reflect.Value, def *Schema) error {
 
 	for pname, pdef := range def.Properties {
 		delete(namesMap, pname)
-		if err := validateProp(rv, pname, pdef, def.isPropRequired(pname)); err != nil {
+		if err := validateProp(rv, pname, pdef, def.IsPropRequired(pname)); err != nil {
 			return err
 		}
 	}
@@ -742,7 +742,7 @@ func validateObject(rv reflect.Value, def *Schema) error {
 			for pat, pdef := range pp {
 				if pat.MatchString(pname) {
 					delete(namesMap, pname)
-					if err := validateProp(rv, pname, pdef, def.isPropRequired(pname)); err != nil {
+					if err := validateProp(rv, pname, pdef, def.IsPropRequired(pname)); err != nil {
 						return err
 					}
 				}

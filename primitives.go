@@ -98,3 +98,12 @@ func (b Bool) Bool() bool {
 	}
 	return b.Default
 }
+
+func (ts PrimitiveTypes) Contains(p PrimitiveType) bool {
+	for _, v := range ts {
+		if p == v {
+			return true
+		}
+	}
+	return false
+}

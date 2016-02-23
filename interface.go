@@ -7,10 +7,11 @@ import (
 	"github.com/lestrrat/go-jsref"
 )
 
-const SchemaURL = `http://json-schema.org/draft-04/schema`
-const HyperSchemaURL = `http://json-schema.org/draft-03/hyper-schema`
-
-const MIMEType = "application/schema+json"
+const (
+	SchemaURL      = `http://json-schema.org/draft-04/schema`
+	HyperSchemaURL = `http://json-schema.org/draft-03/hyper-schema`
+	MIMEType       = "application/schema+json"
+)
 
 var (
 	ErrAdditionalProperties        = errors.New("additional properties are not allowed")
