@@ -43,7 +43,7 @@ func (s *Schema) initialize() {
 	mp.Set(HyperSchemaURL, &_hyperSchema)
 	resolver.AddProvider(mp)
 
-	s.schemaByID = make(map[string]*Schema)
+	s.resolvedSchemas = make(map[string]interface{})
 	s.resolver = resolver
 }
 
@@ -160,34 +160,6 @@ func (s *Schema) findSchemaByID(id string) (*Schema, error) {
 	return nil, ErrSchemaNotFound
 }
 
-func (s *Schema) ResolveID(id string) (r *Schema, err error) {
-	if pdebug.Enabled {
-		g := pdebug.IPrintf("START Schema.ResolveID '%s'", id)
-		defer func() {
-			if err != nil {
-				g.IRelease("END Schema.ResolveID '%s': error %s", id, err)
-			} else {
-				g.IRelease("END Schema.ResolveID '%s' -> %p", id, r)
-			}
-		}()
-	}
-	root := s.Root()
-
-	var ok bool
-	r, ok = root.schemaByID[id]
-	if ok {
-		return
-	}
-
-	r, err = root.findSchemaByID(id)
-	if err != nil {
-		return
-	}
-
-	root.schemaByID[id] = r
-	return
-}
-
 func (s Schema) ResolveURL(v string) (u *url.URL, err error) {
 	if pdebug.Enabled {
 		g := pdebug.IPrintf("START Schema.ResolveURL '%s'", v)
@@ -210,31 +182,67 @@ func (s Schema) ResolveURL(v string) (u *url.URL, err error) {
 	return u, nil
 }
 
-// Resolve the current schema reference, if '$ref' exists
-func resolveSchemaReference(s *Schema) (res *Schema, err error) {
+// Resolve returns the schema after it has been resolved.
+// If s.Reference is the empty string, the current schema is returned.
+func (s *Schema) Resolve() (ref *Schema, err error) {
 	if s.Reference == "" {
 		return s, nil
 	}
 
 	if pdebug.Enabled {
-		g := pdebug.IPrintf("START resolveSchemaReference (%s)", s.Reference)
+		g := pdebug.IPrintf("START Schema.Resolve (%s)", s.Reference)
 		defer func() {
 			if err != nil {
-				g.IRelease("END resolveSchemaReference (%s): %s", s.Reference, err)
+				g.IRelease("END Schema.Resolve (%s): %s", s.Reference, err)
 			} else {
-				g.IRelease("END resolveSchemaReference (%s)", s.Reference)
+				g.IRelease("END Schema.Resolve (%s)", s.Reference)
 			}
 		}()
 	}
 
-	thing, err := s.resolver.Resolve(s.Root(), s.Reference)
-	if err != nil {
-		return nil, ErrInvalidReference{Reference: s.Reference, Message: err.Error()}
-	}
+	var thing interface{}
+	var ok bool
+	s.resolveLock.Lock()
+	thing, ok = s.resolvedSchemas[s.Reference]
+	s.resolveLock.Unlock()
 
-	ref, ok := thing.(*Schema)
-	if !ok {
-		return nil, ErrInvalidReference{Reference: s.Reference, Message: "returned element is not a Schema"}
+	if ok {
+		ref, ok = thing.(*Schema)
+		if ok {
+			if pdebug.Enabled {
+				pdebug.Printf("Cache HIT on '%s'", s.Reference)
+			}
+		} else {
+			if pdebug.Enabled {
+				pdebug.Printf("Negative Cache HIT on '%s'", s.Reference)
+			}
+			return nil, thing.(error)
+		}
+	} else {
+		if pdebug.Enabled {
+			pdebug.Printf("Cache MISS on '%s'", s.Reference)
+		}
+		var err error
+		thing, err := s.resolver.Resolve(s.Root(), s.Reference)
+		if err != nil {
+			err = ErrInvalidReference{Reference: s.Reference, Message: err.Error()}
+			s.resolveLock.Lock()
+			s.resolvedSchemas[s.Reference] = err
+			s.resolveLock.Unlock()
+			return nil, err
+		}
+
+		ref, ok = thing.(*Schema)
+		if !ok {
+			err = ErrInvalidReference{Reference: s.Reference, Message: "returned element is not a Schema"}
+			s.resolveLock.Lock()
+			s.resolvedSchemas[s.Reference] = err
+			s.resolveLock.Unlock()
+			return nil, err
+		}
+		s.resolveLock.Lock()
+		s.resolvedSchemas[s.Reference] = ref
+		s.resolveLock.Unlock()
 	}
 
 	return ref, nil
@@ -864,7 +872,7 @@ func validate(rv reflect.Value, def *Schema) (err error) {
 		}
 	}
 
-	def, err = resolveSchemaReference(def)
+	def, err = def.Resolve()
 	if err != nil {
 		return
 	}

@@ -3,6 +3,7 @@ package schema
 import (
 	"errors"
 	"regexp"
+	"sync"
 
 	"github.com/lestrrat/go-jsref"
 )
@@ -128,18 +129,19 @@ const (
 )
 
 type Schema struct {
-	parent      *Schema
-	resolver    *jsref.Resolver
-	schemaByID  map[string]*Schema
-	ID          string             `json:"id,omitempty"`
-	Title       string             `json:"title,omitempty"`
-	Description string             `json:"description,omitempty"`
-	Default     interface{}        `json:"default,omitempty"`
-	Type        PrimitiveTypes     `json:"type,omitempty"`
-	SchemaRef   string             `json:"$schema,omitempty"`
-	Definitions map[string]*Schema `json:"definitions,omitempty"`
-	Reference   string             `json:"$ref,omitempty"`
-	Format      Format             `json:"format,omitempty"`
+	parent          *Schema
+	resolveLock     sync.Mutex
+	resolvedSchemas map[string]interface{}
+	resolver        *jsref.Resolver
+	ID              string             `json:"id,omitempty"`
+	Title           string             `json:"title,omitempty"`
+	Description     string             `json:"description,omitempty"`
+	Default         interface{}        `json:"default,omitempty"`
+	Type            PrimitiveTypes     `json:"type,omitempty"`
+	SchemaRef       string             `json:"$schema,omitempty"`
+	Definitions     map[string]*Schema `json:"definitions,omitempty"`
+	Reference       string             `json:"$ref,omitempty"`
+	Format          Format             `json:"format,omitempty"`
 
 	// NumericValidations
 	MultipleOf       Number `json:"multipleOf,omitempty"`
