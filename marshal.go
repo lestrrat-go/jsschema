@@ -164,7 +164,7 @@ func extractSchema(s **Schema, m map[string]interface{}, name string) error {
 		return ErrInvalidType
 	}
 	*s = New()
-	if err := (*s).extract(v.(map[string]interface{})); err != nil {
+	if err := (*s).Extract(v.(map[string]interface{})); err != nil {
 		return err
 	}
 	return nil
@@ -182,7 +182,7 @@ func extractSchemaList(l *[]*Schema, m map[string]interface{}, name string) erro
 		*l = make([]*Schema, len(src))
 		for i, d := range src {
 			s := New()
-			if err := s.extract(d.(map[string]interface{})); err != nil {
+			if err := s.Extract(d.(map[string]interface{})); err != nil {
 				return err
 			}
 			(*l)[i] = s
@@ -190,7 +190,7 @@ func extractSchemaList(l *[]*Schema, m map[string]interface{}, name string) erro
 		return nil
 	case map[string]interface{}:
 		s := New()
-		if err := s.extract(v.(map[string]interface{})); err != nil {
+		if err := s.Extract(v.(map[string]interface{})); err != nil {
 			return err
 		}
 		*l = []*Schema{s}
@@ -217,7 +217,7 @@ func extractSchemaMap(m map[string]interface{}, name string) (map[string]*Schema
 				return nil, ErrInvalidFieldValue{Name: name}
 			}
 			s := New()
-			if err := s.extract(data.(map[string]interface{})); err != nil {
+			if err := s.Extract(data.(map[string]interface{})); err != nil {
 				return nil, err
 			}
 			r[k] = s
@@ -244,7 +244,7 @@ func extractRegexpToSchemaMap(m map[string]interface{}, name string) (map[*regex
 				return nil, ErrInvalidFieldValue{Name: name}
 			}
 			s := New()
-			if err := s.extract(data.(map[string]interface{})); err != nil {
+			if err := s.Extract(data.(map[string]interface{})); err != nil {
 				return nil, err
 			}
 
@@ -318,7 +318,7 @@ func extractDependecies(res *DependencyMap, m map[string]interface{}, name strin
 					return ErrInvalidFieldValue{Name: k}
 				}
 				s := New()
-				if err := s.extract(data.(map[string]interface{})); err != nil {
+				if err := s.Extract(data.(map[string]interface{})); err != nil {
 					return err
 				}
 				r[k] = s
@@ -337,10 +337,10 @@ func (s *Schema) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	return s.extract(m)
+	return s.Extract(m)
 }
 
-func (s *Schema) extract(m map[string]interface{}) error {
+func (s *Schema) Extract(m map[string]interface{}) error {
 	var err error
 
 	if err = extractString(&s.ID, m, "id"); err != nil {
