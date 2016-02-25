@@ -9,6 +9,7 @@ JSON Schema for Go
 # TODO
 
 * Properly resolve ids and $refs (it works in simple cases, but elaborate scopes probably don't work)
+* Would be nice to swap `schema.Validate` with `jsval.Validate`
 
 # CAVEATS
 
