@@ -6,10 +6,6 @@
 
 JSON Schema for Go
 
-# CAVEATS
-
-* Dependencies: Currently schema dependencies are NOT supported. If you must specify a schema, you probably should define a non-required property (PRs welcome). See [go-jsval](https://github.com/lestrrat/go-jsval) for a validator that handles it.
-
 # SYNOPSIS
 
 ```go
