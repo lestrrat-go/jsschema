@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/lestrrat/go-jsschema"
+	"github.com/lestrrat/go-jsschema/validator"
 )
 
 func main() {
@@ -76,7 +77,8 @@ func _main() int {
 		return 1
 	}
 
-	if err := s.Validate(v); err != nil {
+	valid := validator.New(s)
+	if err := valid.Validate(v); err != nil {
 		log.Printf("validation failed")
 		return 1
 	}
