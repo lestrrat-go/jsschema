@@ -6,14 +6,9 @@
 
 JSON Schema for Go
 
-# TODO
-
-* Properly resolve ids and $refs (it works in simple cases, but elaborate scopes probably don't work)
-* Would be nice to swap `schema.Validate` with `jsval.Validate`
-
 # CAVEATS
 
-* Dependencies: Currently schema dependencies are NOT supported. If you must specify a schema, you probably should define a non-required property (PRs welcome)
+* Dependencies: Currently schema dependencies are NOT supported. If you must specify a schema, you probably should define a non-required property (PRs welcome). See [go-jsval](https://github.com/lestrrat/go-jsval) for a validator that handles it.
 
 # SYNOPSIS
 
@@ -47,3 +42,16 @@ func Example() {
   }
 }
 ```
+
+# TODO
+
+* Properly resolve ids and $refs (it works in simple cases, but elaborate scopes probably don't work)
+* Would be nice to swap `schema.Validate` with `jsval.Validate`
+
+# References
+
+| Name                                                     | Notes                         |
+|:--------------------------------------------------------:|:------------------------------|
+| [go-jsval](https://github.com/lestrrat/go-jsval)         | Validator generator           |
+| [go-jsref](https://github.com/lestrrat/go-jsref)         | JSON Reference implementation |
+| [go-jspointer](https://github.com/lestrrat/go-jspointer) | JSON Pointer implementations  |
