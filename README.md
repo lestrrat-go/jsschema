@@ -8,7 +8,11 @@ JSON Schema for Go
 
 # TODO
 
-* Properly resolve ids and $refs.
+* Properly resolve ids and $refs (it works in simple cases, but elaborate scopes probably don't work)
+
+# CAVEATS
+
+* Dependencies: Currently schema dependencies are NOT supported. If you must specify a schema, you probably should define a non-required property (PRs welcome)
 
 # SYNOPSIS
 

@@ -758,37 +758,33 @@ func validateObject(rv reflect.Value, def *Schema) error {
 		}
 	}
 
-	for pname, pdef := range def.Dependencies {
-		pv := getProp(rv, pname)
-		if pv == zeroval {
+	for pname, deplist := range def.Dependencies.Names {
+		if pv := getProp(rv, pname); pv == zeroval {
 			continue
 		}
 
 		if pdebug.Enabled {
-			pdebug.Printf("Property %s has dependencies!", pname)
+			pdebug.Printf("Property %s has property dependencies!", pname)
 		}
 
-		delete(namesMap, pname)
-		switch pdef.(type) {
-		case []interface{}:
-			for _, depname := range pdef.([]interface{}) {
-				switch depname.(type) {
-				case string:
-				default:
-					return ErrInvalidFieldValue{Name: pname}
-				}
-				if err := validateProp(rv, depname.(string), nil, true); err != nil {
-					return err
-				}
+		for _, depname := range deplist {
+			if dv := getProp(rv, depname); dv == zeroval {
+				return ErrMissingDependency
 			}
-		case map[string]interface{}:
-			for depname, depdef := range pdef.(map[string]*Schema) {
-				if err := validateProp(rv, depname, depdef, true); err != nil {
-					return err
-				}
-			}
-		default:
-			return errors.New("invalid dependency type")
+		}
+	}
+
+	for pname, depschema := range def.Dependencies.Schemas {
+		if pv := getProp(rv, pname); pv == zeroval {
+			continue
+		}
+
+		if pdebug.Enabled {
+			pdebug.Printf("Property %s has schema dependency!", pname)
+		}
+
+		if err := validateObject(rv, depschema); err != nil {
+			return err
 		}
 	}
 

@@ -18,6 +18,8 @@ var (
 	ErrAdditionalProperties        = errors.New("additional properties are not allowed")
 	ErrAnyOfValidationFailed       = errors.New("'anyOf' validation failed")
 	ErrArrayItemValidationFailed   = errors.New("'array' validation failed")
+	ErrInvalidStringArray          = errors.New("invalid value: expected array of string")
+	ErrDependencyItemType          = errors.New("'dependency' elements must be a array of strings or a schema")
 	ErrOneOfValidationFailed       = errors.New("'oneOf' validation failed")
 	ErrIntegerValidationFailed     = errors.New("'integer' validation failed")
 	ErrInvalidEnum                 = errors.New("invalid enum type")
@@ -26,6 +28,7 @@ var (
 	ErrInvalidIPv4                 = errors.New("invalid IPv4 address")
 	ErrInvalidIPv6                 = errors.New("invalid IPv6 address")
 	ErrInvalidType                 = errors.New("invalid type")
+	ErrMissingDependency           = errors.New("missing dependency")
 	ErrMultipleOfValidationFailed  = errors.New("'multipleOf' validation failed")
 	ErrNotValidationFailed         = errors.New("'not' validation failed")
 	ErrNumberValidationFailed      = errors.New("'number' validation failed")
@@ -186,7 +189,13 @@ type AdditionalProperties struct {
 	*Schema
 }
 
-type DependencyMap map[string]interface{}
+// DependencyMap contains the dependencies defined within this schema.
+// for a given dependency name, you can have either a schema or a
+// list of property names
+type DependencyMap struct {
+	Names   map[string][]string
+	Schemas map[string]*Schema
+}
 
 type ItemSpec struct {
 	TupleMode bool // If this is true, the positions mean something. if false, len(Schemas) should be 1, and we should apply the same schema validation to all elements

@@ -72,30 +72,34 @@ func extractString(s *string, m map[string]interface{}, name string) error {
 	return nil
 }
 
-func extractStringList(l *[]string, m map[string]interface{}, s string) error {
-	if v, ok := m[s]; ok {
-		switch v.(type) {
-		case string:
-			*l = []string{v.(string)}
-			return nil
-		case []interface{}:
-			src := v.([]interface{})
-			*l = make([]string, len(src))
-			for i, x := range src {
-				switch x.(type) {
-				case string:
-					(*l)[i] = x.(string)
-				default:
-					return ErrInvalidFieldValue{Name: s}
-				}
+func convertStringList(l *[]string, v interface{}) error {
+	switch v.(type) {
+	case string: // One element
+		*l = []string{v.(string)}
+	case []interface{}: // List of elements.
+		src := v.([]interface{})
+		*l = make([]string, len(src))
+		for i, x := range src {
+			switch x.(type) {
+			case string:
+			default:
+				return ErrInvalidStringArray
 			}
-			return nil
-		default:
-			return ErrInvalidFieldValue{Name: s}
-		}
-	}
 
+			(*l)[i] = x.(string)
+		}
+	default:
+		return ErrInvalidStringArray
+	}
 	return nil
+}
+
+func extractStringList(l *[]string, m map[string]interface{}, s string) error {
+	v, ok := m[s]
+	if !ok {
+		return nil
+	}
+	return convertStringList(l, v)
 }
 
 func extractFormat(f *Format, m map[string]interface{}, s string) error {
@@ -303,31 +307,31 @@ func extractDependecies(res *DependencyMap, m map[string]interface{}, name strin
 		return nil
 	}
 
-	deps := DependencyMap{}
+	return res.extract(m)
+}
+
+func (dm *DependencyMap) extract(m map[string]interface{}) error {
+	dm.Names = make(map[string][]string)
+	dm.Schemas = make(map[string]*Schema)
 	for k, p := range m {
 		switch p.(type) {
 		case []interface{}:
-			deps[k] = p
-		case map[string]interface{}:
-			r := make(map[string]*Schema)
-			for k, data := range p.(map[string]interface{}) {
-				// data better be a map
-				switch data.(type) {
-				case map[string]interface{}:
-				default:
-					return ErrInvalidFieldValue{Name: k}
-				}
-				s := New()
-				if err := s.Extract(data.(map[string]interface{})); err != nil {
-					return err
-				}
-				r[k] = s
+			// This list needs to be a list of strings
+			var l []string
+			if err := convertStringList(&l, p.([]interface{})); err != nil {
+				return err
 			}
-			deps[k] = r
+
+			dm.Names[k] = l
+		case map[string]interface{}:
+			s := New()
+			if err := s.Extract(p.(map[string]interface{})); err != nil {
+				return err
+			}
+			dm.Schemas[k] = s
 		}
 	}
 
-	*res = deps
 	return nil
 }
 
@@ -692,8 +696,20 @@ func (s Schema) MarshalJSON() ([]byte, error) {
 		place(m, "not", v)
 	}
 
-	if v := s.Dependencies; v != nil {
-		place(m, "dependencies", v)
+	deps := map[string]interface{}{}
+	if v := s.Dependencies.Schemas; v != nil {
+		for pname, depschema := range v {
+			deps[pname] = depschema
+		}
+	}
+	if v := s.Dependencies.Names; v != nil {
+		for pname, deplist := range v {
+			deps[pname] = deplist
+		}
+	}
+
+	if len(deps) > 0 {
+		place(m, "dependencies", deps)
 	}
 
 	return json.Marshal(m)
