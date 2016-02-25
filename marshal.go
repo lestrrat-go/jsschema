@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"reflect"
 	"regexp"
+
+	"github.com/lestrrat/go-pdebug"
 )
 
 func extractNumber(n *Number, m map[string]interface{}, s string) error {
@@ -205,19 +207,23 @@ func extractSchemaList(l *[]*Schema, m map[string]interface{}, name string) erro
 }
 
 func extractSchemaMap(m map[string]interface{}, name string) (map[string]*Schema, error) {
-	if v, ok := m[name]; ok {
-		switch v.(type) {
+	v, ok := m[name]
+	if !ok {
+		return nil, nil
+	}
+
+	switch v.(type) {
+	case map[string]interface{}:
+	default:
+		return nil, ErrInvalidFieldValue{Name: name}
+	}
+
+	r := make(map[string]*Schema)
+	for k, data := range v.(map[string]interface{}) {
+		// data better be a map
+		switch data.(type) {
 		case map[string]interface{}:
 		default:
-			return nil, ErrInvalidFieldValue{Name: name}
-		}
-
-		r := make(map[string]*Schema)
-		for k, data := range v.(map[string]interface{}) {
-			// data better be a map
-			switch data.(type) {
-			case map[string]interface{}:
-			default:
 				return nil, ErrInvalidFieldValue{Name: name}
 			}
 			s := New()
@@ -227,8 +233,6 @@ func extractSchemaMap(m map[string]interface{}, name string) (map[string]*Schema
 			r[k] = s
 		}
 		return r, nil
-	}
-	return nil, nil
 }
 
 func extractRegexpToSchemaMap(m map[string]interface{}, name string) (map[*regexp.Regexp]*Schema, error) {
@@ -345,6 +349,11 @@ func (s *Schema) UnmarshalJSON(data []byte) error {
 }
 
 func (s *Schema) Extract(m map[string]interface{}) error {
+	if pdebug.Enabled {
+		g := pdebug.IPrintf("START Schema.Extract")
+		defer g.IRelease("END Schema.Extract")
+	}
+
 	var err error
 
 	if err = extractString(&s.ID, m, "id"); err != nil {

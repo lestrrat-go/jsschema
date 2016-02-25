@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/lestrrat/go-jsschema"
+	"github.com/lestrrat/go-jsschema/validator"
 )
 
 func Example() {
@@ -20,9 +21,12 @@ func Example() {
 		_ = pdef
 	}
 
+	// Create a validator
+	v := validator.New(s)
+
 	// You can also validate an arbitrary piece of data
 	var p interface{} // initialize using json.Unmarshal...
-	if err := s.Validate(p); err != nil {
+	if err := v.Validate(p); err != nil {
 		log.Printf("failed to validate data: %s", err)
 	}
 }

@@ -1,4 +1,4 @@
-package schema
+package schema_test
 
 import (
 	"encoding/json"
@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/lestrrat/go-jsschema"
+	"github.com/lestrrat/go-jsschema/validator"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,12 +23,12 @@ func TestReadSchema(t *testing.T) {
 	}
 }
 
-func readSchema(f string) (*Schema, error) {
+func readSchema(f string) (*schema.Schema, error) {
 	in, err := os.Open(f)
 	if err != nil {
 		return nil, err
 	}
-	return Read(in)
+	return schema.Read(in)
 }
 
 func TestValidate(t *testing.T) {
@@ -60,6 +62,8 @@ func TestValidate(t *testing.T) {
 			return
 		}
 
+		valid := validator.New(schema)
+
 		pat := filepath.Join("test", fmt.Sprintf("%s_pass*.json", name))
 		files, _ := filepath.Glob(pat)
 		for _, passf := range files {
@@ -73,7 +77,7 @@ func TestValidate(t *testing.T) {
 				return
 			}
 
-			if !assert.NoError(t, schema.Validate(m), "schema.Validate should succeed") {
+			if !assert.NoError(t, valid.Validate(m), "schema.Validate should succeed") {
 				return
 			}
 		}
@@ -91,7 +95,7 @@ func TestValidate(t *testing.T) {
 				return
 			}
 
-			if !assert.Error(t, schema.Validate(m), "schema.Validate should fail") {
+			if !assert.Error(t, valid.Validate(m), "schema.Validate should fail") {
 				return
 			}
 		}
