@@ -107,3 +107,16 @@ func (ts PrimitiveTypes) Contains(p PrimitiveType) bool {
 	}
 	return false
 }
+
+func (pt PrimitiveTypes) Len() int {
+	return len(pt)
+}
+
+func (pt PrimitiveTypes) Less(i, j int) bool {
+	return pt[i] < pt[j]
+}
+
+func (pt PrimitiveTypes) Swap(i, j int) {
+	pt[i], pt[j] = pt[j], pt[i]
+}
+
