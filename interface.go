@@ -27,6 +27,7 @@ var (
 	ErrInvalidHostname             = errors.New("invalid hostname")
 	ErrInvalidIPv4                 = errors.New("invalid IPv4 address")
 	ErrInvalidIPv6                 = errors.New("invalid IPv6 address")
+	ErrInvalidSchemaList           = errors.New("invalid schema list")
 	ErrInvalidType                 = errors.New("invalid type")
 	ErrMissingDependency           = errors.New("missing dependency")
 	ErrMultipleOfValidationFailed  = errors.New("'multipleOf' validation failed")
@@ -131,6 +132,7 @@ const (
 	NumberType
 )
 
+type SchemaList []*Schema
 type Schema struct {
 	parent          *Schema
 	resolveLock     sync.Mutex
@@ -175,9 +177,9 @@ type Schema struct {
 	PatternProperties    map[*regexp.Regexp]*Schema `json:"patternProperties,omitempty"`
 
 	Enum  []interface{} `json:"enum,omitempty"`
-	AllOf []*Schema     `json:"allOf,omitempty"`
-	AnyOf []*Schema     `json:"anyOf,omitempty"`
-	OneOf []*Schema     `json:"oneOf,omitempty"`
+	AllOf SchemaList    `json:"allOf,omitempty"`
+	AnyOf SchemaList    `json:"anyOf,omitempty"`
+	OneOf SchemaList    `json:"oneOf,omitempty"`
 	Not   *Schema       `json:"not,omitempty"`
 }
 
@@ -199,5 +201,5 @@ type DependencyMap struct {
 
 type ItemSpec struct {
 	TupleMode bool // If this is true, the positions mean something. if false, len(Schemas) should be 1, and we should apply the same schema validation to all elements
-	Schemas   []*Schema
+	Schemas   SchemaList
 }

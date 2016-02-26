@@ -176,12 +176,16 @@ func extractSchema(s **Schema, m map[string]interface{}, name string) error {
 	return nil
 }
 
-func extractSchemaList(l *[]*Schema, m map[string]interface{}, name string) error {
+func (l *SchemaList) ExtractIfPresent(m map[string]interface{}, name string) error {
 	v, ok := m[name]
 	if !ok {
 		return nil
 	}
 
+	return l.Extract(v)
+}
+
+func (l *SchemaList) Extract(v interface{}) error {
 	switch v.(type) {
 	case []interface{}:
 		src := v.([]interface{})
@@ -202,7 +206,7 @@ func extractSchemaList(l *[]*Schema, m map[string]interface{}, name string) erro
 		*l = []*Schema{s}
 		return nil
 	default:
-		return ErrInvalidFieldValue{Name: name}
+		return ErrInvalidSchemaList
 	}
 }
 
@@ -287,7 +291,8 @@ func extractItems(res **ItemSpec, m map[string]interface{}, name string) error {
 	items.TupleMode = tupleMode
 
 	var err error
-	if err = extractSchemaList(&items.Schemas, m, name); err != nil {
+
+	if err = items.Schemas.ExtractIfPresent(m, name); err != nil {
 		return err
 	}
 	*res = &items
@@ -536,15 +541,15 @@ func (s *Schema) Extract(m map[string]interface{}) error {
 		return ErrExtract{Field: "patternProperties", Err: err}
 	}
 
-	if err = extractSchemaList(&s.AllOf, m, "allOf"); err != nil {
+	if err = s.AllOf.ExtractIfPresent(m, "allOf"); err != nil {
 		return ErrExtract{Field: "allOf", Err: err}
 	}
 
-	if err = extractSchemaList(&s.AnyOf, m, "anyOf"); err != nil {
+	if err = s.AnyOf.ExtractIfPresent(m, "anyOf"); err != nil {
 		return ErrExtract{Field: "anyOf", Err: err}
 	}
 
-	if err = extractSchemaList(&s.OneOf, m, "oneOf"); err != nil {
+	if err = s.OneOf.ExtractIfPresent(m, "oneOf"); err != nil {
 		return ErrExtract{Field: "oneOf", Err: err}
 	}
 

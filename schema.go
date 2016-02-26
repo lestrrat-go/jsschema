@@ -52,13 +52,13 @@ func ReadFile(f string) (*Schema, error) {
 
 func Read(in io.Reader) (*Schema, error) {
 	s := New()
-	if err := s.decode(in); err != nil {
+	if err := s.Decode(in); err != nil {
 		return nil, err
 	}
 	return s, nil
 }
 
-func (s *Schema) decode(in io.Reader) error {
+func (s *Schema) Decode(in io.Reader) error {
 	dec := json.NewDecoder(in)
 	if err := dec.Decode(s); err != nil {
 		return err
@@ -417,7 +417,7 @@ func buildJSSchema() {
   },
   "default": {}
 }`
-	if err := _schema.decode(strings.NewReader(src)); err != nil {
+	if err := _schema.Decode(strings.NewReader(src)); err != nil {
 		// We regret to inform you that if we can't parse this
 		// schema, then we have a real real real problem, so we're
 		// going to panic
@@ -595,7 +595,7 @@ func buildHyperSchema() {
     }
   ]
 }`
-	if err := _hyperSchema.decode(strings.NewReader(src)); err != nil {
+	if err := _hyperSchema.Decode(strings.NewReader(src)); err != nil {
 		// We regret to inform you that if we can't parse this
 		// schema, then we have a real real real problem, so we're
 		// going to panic
