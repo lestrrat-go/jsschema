@@ -46,6 +46,7 @@ func TestValidate(t *testing.T) {
 		"not",
 		"null",
 		"numrange",
+		"numrange_exclmax",
 		"objectpatterns",
 		"objectpropdepend",
 		"objectpropsize",
