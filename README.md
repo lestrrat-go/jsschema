@@ -47,8 +47,9 @@ func Example() {
 
 # References
 
-| Name                                                     | Notes                         |
-|:--------------------------------------------------------:|:------------------------------|
-| [go-jsval](https://github.com/lestrrat/go-jsval)         | Validator generator           |
-| [go-jsref](https://github.com/lestrrat/go-jsref)         | JSON Reference implementation |
-| [go-jspointer](https://github.com/lestrrat/go-jspointer) | JSON Pointer implementations  |
+| Name                                                     | Notes                            |
+|:--------------------------------------------------------:|:---------------------------------|
+| [go-jsval](https://github.com/lestrrat/go-jsval)         | Validator generator              |
+| [go-jshschema](https://github.com/lestrrat/go-jshschema) | JSON Hyper Schema implementation |
+| [go-jsref](https://github.com/lestrrat/go-jsref)         | JSON Reference implementation    |
+| [go-jspointer](https://github.com/lestrrat/go-jspointer) | JSON Pointer implementations     |
