@@ -176,11 +176,12 @@ type Schema struct {
 	AdditionalProperties *AdditionalProperties      `json:"additionalProperties,omitempty"`
 	PatternProperties    map[*regexp.Regexp]*Schema `json:"patternProperties,omitempty"`
 
-	Enum  []interface{} `json:"enum,omitempty"`
-	AllOf SchemaList    `json:"allOf,omitempty"`
-	AnyOf SchemaList    `json:"anyOf,omitempty"`
-	OneOf SchemaList    `json:"oneOf,omitempty"`
-	Not   *Schema       `json:"not,omitempty"`
+	Enum   []interface{}          `json:"enum,omitempty"`
+	AllOf  SchemaList             `json:"allOf,omitempty"`
+	AnyOf  SchemaList             `json:"anyOf,omitempty"`
+	OneOf  SchemaList             `json:"oneOf,omitempty"`
+	Not    *Schema                `json:"not,omitempty"`
+	Extras map[string]interface{} `json:"-"`
 }
 
 type AdditionalItems struct {

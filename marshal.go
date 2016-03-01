@@ -228,15 +228,15 @@ func extractSchemaMap(m map[string]interface{}, name string) (map[string]*Schema
 		switch data.(type) {
 		case map[string]interface{}:
 		default:
-				return nil, ErrInvalidFieldValue{Name: name}
-			}
-			s := New()
-			if err := s.Extract(data.(map[string]interface{})); err != nil {
-				return nil, err
-			}
-			r[k] = s
+			return nil, ErrInvalidFieldValue{Name: name}
 		}
-		return r, nil
+		s := New()
+		if err := s.Extract(data.(map[string]interface{})); err != nil {
+			return nil, err
+		}
+		r[k] = s
+	}
+	return r, nil
 }
 
 func extractRegexpToSchemaMap(m map[string]interface{}, name string) (map[*regexp.Regexp]*Schema, error) {
@@ -559,6 +559,14 @@ func (s *Schema) Extract(m map[string]interface{}) error {
 
 	s.applyParentSchema()
 
+	s.Extras = make(map[string]interface{})
+	for k, v := range m {
+		switch k {
+		case "id", "title", "description", "required", "$schema", "$ref", "format", "enum", "default", "type", "definitions", "items", "pattern", "minLength", "maxLength", "minItems", "maxItems", "uniqueItems", "maxProperties", "minProperties", "minimum", "exclusiveMinimum", "maximum", "exclusiveMaximum", "multipleOf", "properties", "dependencies", "additionalItems", "additionalProperties", "patternProperties", "allOf", "anyOf", "oneOf", "not":
+			continue
+		}
+		s.Extras[k] = v
+	}
 	return nil
 }
 
