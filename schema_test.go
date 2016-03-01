@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/lestrrat/go-jsschema"
@@ -99,6 +100,24 @@ func TestValidate(t *testing.T) {
 			if !assert.Error(t, valid.Validate(m), "schema.Validate should fail") {
 				return
 			}
+		}
+	}
+}
+
+func TestExtras(t *testing.T) {
+	const src = `{
+  "extra1": "foo",
+  "extra2": ["bar", "baz"]
+}`
+	s, err := schema.Read(strings.NewReader(src))
+	if !assert.NoError(t, err, "schema.Read should succeed") {
+		return
+	}
+
+	for _, ek := range []string{"extra1", "extra2"} {
+		_, ok := s.Extras[ek]
+		if !assert.True(t, ok, "Extra item '%s' should exist", ek) {
+			return
 		}
 	}
 }

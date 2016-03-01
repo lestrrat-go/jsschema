@@ -164,6 +164,11 @@ func extractSchema(s **Schema, m map[string]interface{}, name string) error {
 	if !ok {
 		return nil
 	}
+
+	if pdebug.Enabled {
+		pdebug.Printf("Found property '%s'", name)
+	}
+
 	switch v.(type) {
 	case map[string]interface{}:
 	default:
@@ -180,6 +185,10 @@ func (l *SchemaList) ExtractIfPresent(m map[string]interface{}, name string) err
 	v, ok := m[name]
 	if !ok {
 		return nil
+	}
+
+	if pdebug.Enabled {
+		pdebug.Printf("Found property '%s'", name)
 	}
 
 	return l.Extract(v)
@@ -210,6 +219,14 @@ func (l *SchemaList) Extract(v interface{}) error {
 	}
 }
 
+func extractSchemaMapEntry(s *Schema, name string, m map[string]interface{}) error {
+	if pdebug.Enabled {
+		g := pdebug.Marker("Schema map entry '%s'", name)
+		defer g.End()
+	}
+	return s.Extract(m)
+}
+
 func extractSchemaMap(m map[string]interface{}, name string) (map[string]*Schema, error) {
 	v, ok := m[name]
 	if !ok {
@@ -230,11 +247,18 @@ func extractSchemaMap(m map[string]interface{}, name string) (map[string]*Schema
 		default:
 			return nil, ErrInvalidFieldValue{Name: name}
 		}
+
 		s := New()
-		if err := s.Extract(data.(map[string]interface{})); err != nil {
+		if err := extractSchemaMapEntry(s, k, data.(map[string]interface{})); err != nil {
 			return nil, err
 		}
 		r[k] = s
+
+		if k == "domain" {
+			if pdebug.Enabled {
+				pdebug.Printf("after extractSchemaMapEntry: %#v", s.Extras)
+			}
+		}
 	}
 	return r, nil
 }
@@ -276,6 +300,10 @@ func extractItems(res **ItemSpec, m map[string]interface{}, name string) error {
 	v, ok := m[name]
 	if !ok {
 		return nil
+	}
+
+	if pdebug.Enabled {
+		pdebug.Printf("Found array element '%s'", name)
 	}
 
 	tupleMode := false
@@ -565,8 +593,16 @@ func (s *Schema) Extract(m map[string]interface{}) error {
 		case "id", "title", "description", "required", "$schema", "$ref", "format", "enum", "default", "type", "definitions", "items", "pattern", "minLength", "maxLength", "minItems", "maxItems", "uniqueItems", "maxProperties", "minProperties", "minimum", "exclusiveMinimum", "maximum", "exclusiveMaximum", "multipleOf", "properties", "dependencies", "additionalItems", "additionalProperties", "patternProperties", "allOf", "anyOf", "oneOf", "not":
 			continue
 		}
+		if pdebug.Enabled {
+			pdebug.Printf("Extracting extra field '%s'", k)
+		}
 		s.Extras[k] = v
 	}
+
+	if pdebug.Enabled {
+		pdebug.Printf("Successfully extracted schema")
+	}
+
 	return nil
 }
 
@@ -732,6 +768,12 @@ func (s Schema) MarshalJSON() ([]byte, error) {
 
 	if len(deps) > 0 {
 		place(m, "dependencies", deps)
+	}
+
+	if x := s.Extras; x != nil {
+		for k, v := range x {
+			m[k] = v
+		}
 	}
 
 	return json.Marshal(m)
