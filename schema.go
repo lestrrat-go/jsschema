@@ -176,9 +176,16 @@ func (s Schema) ResolveURL(v string) (u *url.URL, err error) {
 	return u, nil
 }
 
+func (s *Schema) IsResolved() bool {
+	return s.Reference == ""
+}
+
 // Resolve returns the schema after it has been resolved.
 // If s.Reference is the empty string, the current schema is returned.
-func (s *Schema) Resolve() (ref *Schema, err error) {
+//
+// `ctx` is an optional context to resolve the reference with. If not
+// specified, the root schema as returned by `Root` will be used.
+func (s *Schema) Resolve(ctx interface{}) (ref *Schema, err error) {
 	if s.Reference == "" {
 		return s, nil
 	}
@@ -217,7 +224,10 @@ func (s *Schema) Resolve() (ref *Schema, err error) {
 			pdebug.Printf("Cache MISS on '%s'", s.Reference)
 		}
 		var err error
-		thing, err := s.resolver.Resolve(s.Root(), s.Reference)
+		if ctx == nil {
+			ctx = s.Root()
+		}
+		thing, err := s.resolver.Resolve(ctx, s.Reference)
 		if err != nil {
 			err = ErrInvalidReference{Reference: s.Reference, Message: err.Error()}
 			s.resolveLock.Lock()
