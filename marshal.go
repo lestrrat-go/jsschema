@@ -236,7 +236,11 @@ func extractSchemaMap(m map[string]interface{}, name string) (map[string]*Schema
 	switch v.(type) {
 	case map[string]interface{}:
 	default:
-		return nil, ErrInvalidFieldValue{Name: name}
+		return nil, ErrInvalidFieldValue{
+			Message: "value for field should be a map[string]interface{}",
+			Name:    name,
+			Value:   reflect.ValueOf(v),
+		}
 	}
 
 	r := make(map[string]*Schema)
@@ -245,7 +249,11 @@ func extractSchemaMap(m map[string]interface{}, name string) (map[string]*Schema
 		switch data.(type) {
 		case map[string]interface{}:
 		default:
-			return nil, ErrInvalidFieldValue{Name: name}
+			return nil, ErrInvalidFieldValue{
+				Message: "value for sub-field " + k + " field should be a map[string]interface{}",
+				Name:    name,
+				Value:   reflect.ValueOf(v),
+			}
 		}
 
 		s := New()
@@ -443,8 +451,8 @@ func (s *Schema) Extract(m map[string]interface{}) error {
 					return ErrExtract{
 						Field: "type",
 						Err: ErrInvalidFieldValue{
-							Name: "type",
-							Kind: reflect.ValueOf(ts).Kind().String(),
+							Name:  "type",
+							Value: reflect.ValueOf(v),
 						},
 					}
 				}
@@ -455,7 +463,13 @@ func (s *Schema) Extract(m map[string]interface{}) error {
 				s.Type[i] = t
 			}
 		default:
-			return ErrExtract{Field: "type", Err: ErrInvalidFieldValue{Name: "type", Kind: reflect.ValueOf(v).Kind().String()}}
+			return ErrExtract{
+				Field: "type",
+				Err: ErrInvalidFieldValue{
+					Name:  "type",
+					Value: reflect.ValueOf(v),
+				},
+			}
 		}
 	}
 

@@ -1,65 +1,142 @@
 package schema
 
-import "fmt"
+import (
+	"bytes"
+	"strconv"
+)
 
 func (e ErrExtract) Error() string {
-	return fmt.Sprintf("failed to extract '%s' from JSON: %s", e.Field, e.Err)
+	buf := bytes.Buffer{}
+	buf.WriteString("failed to extract '")
+	buf.WriteString(e.Field)
+	buf.WriteString("' from JSON: ")
+	buf.WriteString(e.Err.Error())
+	return buf.String()
 }
 
 func (e ErrInvalidFieldValue) Error() string {
-	return fmt.Sprintf("invalid value for field %s (%s)", e.Name, e.Kind)
+	buf := bytes.Buffer{}
+	buf.WriteString("invalid value for field ")
+	buf.WriteString(e.Name)
+	buf.WriteString(" (")
+	switch e.Value {
+	case zeroval:
+		buf.WriteString("invalid value")
+	default:
+		buf.WriteString(e.Value.Type().String())
+	}
+	buf.WriteByte(')')
+	if msg := e.Message; msg != "" {
+		buf.WriteString(": ")
+		buf.WriteString(msg)
+	}
+
+	return buf.String()
 }
 
 func (e ErrInvalidReference) Error() string {
-	return fmt.Sprintf("failed to resolve reference '%s': %s", e.Reference, e.Message)
+	buf := bytes.Buffer{}
+	buf.WriteString("failed to resolve reference '")
+	buf.WriteString(e.Reference)
+	buf.WriteString("': ")
+	buf.WriteString(e.Message)
+	return buf.String()
 }
 
 func (e ErrRequiredField) Error() string {
-	return fmt.Sprintf("required field '%s' not found", e.Name)
+	buf := bytes.Buffer{}
+	buf.WriteString("required field '")
+	buf.WriteString(e.Name)
+	buf.WriteString("' not found")
+	return buf.String()
 }
 
 func (e ErrMinLengthValidationFailed) Error() string {
-	return fmt.Sprintf("required minimum length not met: %d < %d", e.Len, e.MinLength)
+	buf := bytes.Buffer{}
+	buf.WriteString("required minimum length not met: ")
+	buf.WriteString(strconv.Itoa(e.Len))
+	buf.WriteString(" < ")
+	buf.WriteString(strconv.Itoa(e.MinLength))
+	return buf.String()
 }
 
 func (e ErrMaxLengthValidationFailed) Error() string {
-	return fmt.Sprintf("required maximum length not met: %d > %d", e.Len, e.MaxLength)
+	buf := bytes.Buffer{}
+	buf.WriteString("required maximum length not met: ")
+	buf.WriteString(strconv.Itoa(e.Len))
+	buf.WriteString(" > ")
+	buf.WriteString(strconv.Itoa(e.MaxLength))
+	return buf.String()
 }
 
 func (e ErrMinItemsValidationFailed) Error() string {
-	return fmt.Sprintf("required minimum item count not met: %d < %d", e.Len, e.MinItems)
+	buf := bytes.Buffer{}
+	buf.WriteString("required minimum item count not met: ")
+	buf.WriteString(strconv.Itoa(e.Len))
+	buf.WriteString(" < ")
+	buf.WriteString(strconv.Itoa(e.MinItems))
+	return buf.String()
 }
 
 func (e ErrMaxItemsValidationFailed) Error() string {
-	return fmt.Sprintf("required maximum item count not met: %d > %d", e.Len, e.MaxItems)
+	buf := bytes.Buffer{}
+	buf.WriteString("required maximum item count not met: ")
+	buf.WriteString(strconv.Itoa(e.Len))
+	buf.WriteString(" > ")
+	buf.WriteString(strconv.Itoa(e.MaxItems))
+	return buf.String()
 }
 
 func (e ErrMinPropertiesValidationFailed) Error() string {
-	return fmt.Sprintf("number of properties fewer than minimum number: %d < %d", e.Num, e.Min)
+	buf := bytes.Buffer{}
+	buf.WriteString("number of properties fewer than minimum number: ")
+	buf.WriteString(strconv.Itoa(e.Num))
+	buf.WriteString(" < ")
+	buf.WriteString(strconv.Itoa(e.Min))
+	return buf.String()
 }
 
 func (e ErrMaxPropertiesValidationFailed) Error() string {
-	return fmt.Sprintf("number of properties exceed maximum number: %d > %d", e.Num, e.Max)
+	buf := bytes.Buffer{}
+	buf.WriteString("number of properties exceed maximum number: ")
+	buf.WriteString(strconv.Itoa(e.Num))
+	buf.WriteString(" > ")
+	buf.WriteString(strconv.Itoa(e.Max))
+	return buf.String()
 }
 
 func (e ErrPatternValidationFailed) Error() string {
-	return fmt.Sprintf("pattern did not match: '%s' does not match '%s'", e.Str, e.Pattern)
+	buf := bytes.Buffer{}
+	buf.WriteString("pattern did not match: '")
+	buf.WriteString(e.Str)
+	buf.WriteString("' does not match '")
+	buf.WriteString(e.Pattern.String())
+	buf.WriteString("'")
+	return buf.String()
 }
 
 func (e ErrMinimumValidationFailed) Error() string {
-	sign := "<="
+	buf := bytes.Buffer{}
+	buf.WriteString("value is smaller than minimum: ")
+	buf.WriteString(strconv.FormatFloat(e.Num, 'f', -1, 64))
 	if e.Exclusive {
-		sign = "<"
+		buf.WriteString(" < ")
+	} else {
+		buf.WriteString(" <= ")
 	}
-	return fmt.Sprintf("value exceeds minimum: %d %s %d", e.Num, sign, e.Min)
+	buf.WriteString(strconv.FormatFloat(e.Min, 'f', -1, 64))
+	return buf.String()
 }
 
 func (e ErrMaximumValidationFailed) Error() string {
-	sign := ">="
+	buf := bytes.Buffer{}
+	buf.WriteString("value exceeds maximum: ")
+	buf.WriteString(strconv.FormatFloat(e.Num, 'f', -1, 64))
 	if e.Exclusive {
-		sign = ">"
+		buf.WriteString(" > ")
+	} else {
+		buf.WriteString(" >= ")
 	}
-	return fmt.Sprintf("value exceeds maximum: %d %s %d", e.Num, sign, e.Max)
+	buf.WriteString(strconv.FormatFloat(e.Max, 'f', -1, 64))
+	return buf.String()
 }
-
-

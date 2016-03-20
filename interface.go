@@ -2,6 +2,7 @@ package schema
 
 import (
 	"errors"
+	"reflect"
 	"regexp"
 	"sync"
 
@@ -50,8 +51,9 @@ type ErrExtract struct {
 }
 
 type ErrInvalidFieldValue struct {
-	Name string
-	Kind string
+	Message string // may be empty. may be specified to give more context
+	Name    string
+	Value   reflect.Value
 }
 type ErrInvalidReference struct {
 	Reference string
