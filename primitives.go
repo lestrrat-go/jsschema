@@ -119,4 +119,3 @@ func (pt PrimitiveTypes) Less(i, j int) bool {
 func (pt PrimitiveTypes) Swap(i, j int) {
 	pt[i], pt[j] = pt[j], pt[i]
 }
-
