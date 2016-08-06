@@ -676,7 +676,7 @@ func placeInteger(m map[string]interface{}, name string, n Integer) {
 	place(m, name, n.Val)
 }
 
-func (s Schema) MarshalJSON() ([]byte, error) {
+func (s *Schema) MarshalJSON() ([]byte, error) {
 	m := make(map[string]interface{})
 
 	placeString(m, "id", s.ID)

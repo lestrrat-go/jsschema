@@ -123,7 +123,7 @@ func (s *Schema) applyParentSchema() {
 	}
 }
 
-func (s Schema) BaseURL() *url.URL {
+func (s *Schema) BaseURL() *url.URL {
 	scope := s.Scope()
 	u, err := url.Parse(scope)
 	if err != nil {
@@ -154,7 +154,7 @@ func (s *Schema) findSchemaByID(id string) (*Schema, error) {
 	return nil, ErrSchemaNotFound
 }
 
-func (s Schema) ResolveURL(v string) (u *url.URL, err error) {
+func (s *Schema) ResolveURL(v string) (u *url.URL, err error) {
 	if pdebug.Enabled {
 		g := pdebug.IPrintf("START Schema.ResolveURL '%s'", v)
 		defer func() {
@@ -252,7 +252,7 @@ func (s *Schema) Resolve(ctx interface{}) (ref *Schema, err error) {
 	return ref, nil
 }
 
-func (s Schema) IsPropRequired(pname string) bool {
+func (s *Schema) IsPropRequired(pname string) bool {
 	for _, name := range s.Required {
 		if name == pname {
 			return true
@@ -261,7 +261,7 @@ func (s Schema) IsPropRequired(pname string) bool {
 	return false
 }
 
-func (s Schema) Scope() string {
+func (s *Schema) Scope() string {
 	if pdebug.Enabled {
 		g := pdebug.IPrintf("START Schema.Scope")
 		defer g.IRelease("END Schema.Scope")
