@@ -676,6 +676,18 @@ func placeInteger(m map[string]interface{}, name string, n Integer) {
 	place(m, name, n.Val)
 }
 
+func canBeType(s *Schema, primType PrimitiveType) bool {
+	if len(s.Type) == 0 {
+		return true
+	}
+	for _, t := range s.Type {
+		if t == primType {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *Schema) MarshalJSON() ([]byte, error) {
 	m := make(map[string]interface{})
 
@@ -699,7 +711,14 @@ func (s *Schema) MarshalJSON() ([]byte, error) {
 			place(m, "additionalItems", items.Schema)
 		}
 	} else {
-		place(m, "additionalItems", false)
+		// According to
+		// https://spacetelescope.github.io/understanding-json-schema/reference/array.html#list-validation
+		// additionalItems only makes sense if we are an array type, no
+		// need to inject 'false' for things that are
+		// object/int/float/etc.
+		if canBeType(s, ArrayType) {
+			place(m, "additionalItems", false)
+		}
 	}
 
 	if rx := s.Pattern; rx != nil {
@@ -756,8 +775,14 @@ func (s *Schema) MarshalJSON() ([]byte, error) {
 			place(m, "additionalProperties", ap.Schema)
 		}
 	} else {
+		// Only set
 		// additionalProperties: false
-		placeBool(m, "additionalProperties", Bool{Val: false, Initialized: true})
+		// If we are an Object type.
+		// https://spacetelescope.github.io/understanding-json-schema/reference/object.html#properties
+		// additionalProperties only has meaning for Object types.
+		if canBeType(s, ObjectType) {
+			placeBool(m, "additionalProperties", Bool{Val: false, Initialized: true})
+		}
 	}
 
 	if s.MultipleOf.Val != 0 {
