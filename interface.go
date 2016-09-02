@@ -2,7 +2,6 @@ package schema
 
 import (
 	"errors"
-	"reflect"
 	"regexp"
 	"sync"
 
@@ -15,88 +14,12 @@ const (
 	MIMEType       = "application/schema+json"
 )
 
-var (
-	ErrAdditionalProperties        = errors.New("additional properties are not allowed")
-	ErrAnyOfValidationFailed       = errors.New("'anyOf' validation failed")
-	ErrArrayItemValidationFailed   = errors.New("'array' validation failed")
-	ErrInvalidStringArray          = errors.New("invalid value: expected array of string")
-	ErrDependencyItemType          = errors.New("'dependency' elements must be a array of strings or a schema")
-	ErrOneOfValidationFailed       = errors.New("'oneOf' validation failed")
-	ErrIntegerValidationFailed     = errors.New("'integer' validation failed")
-	ErrInvalidEnum                 = errors.New("invalid enum type")
-	ErrInvalidFormat               = errors.New("invalid format")
-	ErrInvalidHostname             = errors.New("invalid hostname")
-	ErrInvalidIPv4                 = errors.New("invalid IPv4 address")
-	ErrInvalidIPv6                 = errors.New("invalid IPv6 address")
-	ErrInvalidSchemaList           = errors.New("invalid schema list")
-	ErrInvalidType                 = errors.New("invalid type")
-	ErrMissingDependency           = errors.New("missing dependency")
-	ErrMultipleOfValidationFailed  = errors.New("'multipleOf' validation failed")
-	ErrNotValidationFailed         = errors.New("'not' validation failed")
-	ErrNumberValidationFailed      = errors.New("'number' validation failed")
-	ErrPropNotFound                = errors.New("property not found")
-	ErrUniqueItemsValidationFailed = errors.New("'uniqueItems' validation failed")
-	ErrSchemaNotFound              = errors.New("schema not found")
-)
+var ErrExpectedArrayOfString = errors.New("invalid value: expected array of string")
+var ErrInvalidStringArray = ErrExpectedArrayOfString
 
 type PrimitiveType int
 type PrimitiveTypes []PrimitiveType
 type Format string
-type ErrRequiredField struct {
-	Name string
-}
-type ErrExtract struct {
-	Field string
-	Err   error
-}
-
-type ErrInvalidFieldValue struct {
-	Message string // may be empty. may be specified to give more context
-	Name    string
-	Value   reflect.Value
-}
-type ErrInvalidReference struct {
-	Reference string
-	Message   string
-}
-type ErrMinimumValidationFailed struct {
-	Num       float64
-	Min       float64
-	Exclusive bool
-}
-type ErrMaximumValidationFailed struct {
-	Num       float64
-	Max       float64
-	Exclusive bool
-}
-type ErrMinLengthValidationFailed struct {
-	Len       int
-	MinLength int
-}
-type ErrMaxLengthValidationFailed struct {
-	Len       int
-	MaxLength int
-}
-type ErrMinItemsValidationFailed struct {
-	Len      int
-	MinItems int
-}
-type ErrMaxItemsValidationFailed struct {
-	Len      int
-	MaxItems int
-}
-type ErrMinPropertiesValidationFailed struct {
-	Num int
-	Min int
-}
-type ErrMaxPropertiesValidationFailed struct {
-	Num int
-	Max int
-}
-type ErrPatternValidationFailed struct {
-	Str     string
-	Pattern *regexp.Regexp
-}
 
 const (
 	FormatDateTime Format = "date-time"

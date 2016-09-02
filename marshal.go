@@ -2,10 +2,11 @@ package schema
 
 import (
 	"encoding/json"
-	"reflect"
 	"regexp"
+	"strconv"
 
 	"github.com/lestrrat/go-pdebug"
+	"github.com/pkg/errors"
 )
 
 func extractNumber(n *Number, m map[string]interface{}, s string) error {
@@ -17,7 +18,7 @@ func extractNumber(n *Number, m map[string]interface{}, s string) error {
 	switch v.(type) {
 	case float64:
 	default:
-		return ErrInvalidFieldValue{Name: s}
+		return errors.Wrap(errInvalidType("float64", v), "failed to extract number")
 	}
 
 	n.Val = v.(float64)
@@ -33,12 +34,12 @@ func extractInt(n *Integer, m map[string]interface{}, s string) error {
 
 	switch v.(type) {
 	case float64:
-		n.Val = int(v.(float64))
-		n.Initialized = true
 	default:
-		return ErrInvalidFieldValue{Name: s}
+		return errors.Wrap(errInvalidType("float64", v), "failed to extract int")
 	}
 
+	n.Val = int(v.(float64))
+	n.Initialized = true
 	return nil
 }
 
@@ -52,7 +53,7 @@ func extractBool(b *Bool, m map[string]interface{}, s string, def bool) error {
 	switch v.(type) {
 	case bool:
 	default:
-		return ErrInvalidFieldValue{Name: s}
+		return errors.Wrap(errInvalidType("bool", v), "failed to extract bool")
 	}
 
 	b.Val = v.(bool)
@@ -61,16 +62,18 @@ func extractBool(b *Bool, m map[string]interface{}, s string, def bool) error {
 }
 
 func extractString(s *string, m map[string]interface{}, name string) error {
-	if v, ok := m[name]; ok {
-		switch v.(type) {
-		case string:
-			*s = v.(string)
-			return nil
-		default:
-			return ErrInvalidFieldValue{Name: name}
-		}
+	v, ok := m[name]
+	if !ok {
+		return nil
 	}
 
+	switch v.(type) {
+	case string:
+	default:
+		return errors.Wrap(errInvalidType("string", v), "failed to extract string")
+	}
+
+	*s = v.(string)
 	return nil
 }
 
@@ -85,13 +88,13 @@ func convertStringList(l *[]string, v interface{}) error {
 			switch x.(type) {
 			case string:
 			default:
-				return ErrInvalidStringArray
+				return ErrExpectedArrayOfString
 			}
 
 			(*l)[i] = x.(string)
 		}
 	default:
-		return ErrInvalidStringArray
+		return ErrExpectedArrayOfString
 	}
 	return nil
 }
@@ -132,13 +135,17 @@ func extractInterfaceList(l *[]interface{}, m map[string]interface{}, s string) 
 
 	switch v.(type) {
 	case []interface{}:
-		src := v.([]interface{})
-		*l = make([]interface{}, len(src))
-		copy(*l, src)
-		return nil
 	default:
-		return ErrInvalidFieldValue{Name: s}
+		return errors.Wrap(
+			errInvalidType("[]interface{}", v),
+			"failed to extract interface list",
+		)
 	}
+
+	src := v.([]interface{})
+	*l = make([]interface{}, len(src))
+	copy(*l, src)
+	return nil
 }
 
 func extractRegexp(r **regexp.Regexp, m map[string]interface{}, s string) error {
@@ -148,15 +155,26 @@ func extractRegexp(r **regexp.Regexp, m map[string]interface{}, s string) error 
 	}
 	switch v.(type) {
 	case string:
-		rx, err := regexp.Compile(v.(string))
-		if err != nil {
-			return err
-		}
-		*r = rx
-		return nil
 	default:
-		return ErrInvalidType
+		return errors.Wrap(
+			errInvalidType("string", v),
+			"failed to extract regular expression",
+		)
 	}
+
+	rx, err := regexp.Compile(v.(string))
+	if err != nil {
+		return errors.Wrap(
+			errors.Wrapf(
+				err,
+				"failed to compile regular expression: %s",
+				strconv.Quote(v.(string)),
+			),
+			"failed to extract regular expression",
+		)
+	}
+	*r = rx
+	return nil
 }
 
 func extractSchema(s **Schema, m map[string]interface{}, name string) error {
@@ -172,11 +190,19 @@ func extractSchema(s **Schema, m map[string]interface{}, name string) error {
 	switch v.(type) {
 	case map[string]interface{}:
 	default:
-		return ErrInvalidType
+		return errors.Wrap(
+			errInvalidType("map[string]interface{}", v),
+			"failed to extract schema",
+		)
 	}
+
+	return extractSingleSchema(s, v.(map[string]interface{}))
+}
+
+func extractSingleSchema(s **Schema, v interface{}) error {
 	*s = New()
 	if err := (*s).Extract(v.(map[string]interface{})); err != nil {
-		return err
+		return errors.Wrap(err, "failed to extract schema")
 	}
 	return nil
 }
@@ -199,24 +225,27 @@ func (l *SchemaList) Extract(v interface{}) error {
 	case []interface{}:
 		src := v.([]interface{})
 		*l = make([]*Schema, len(src))
+		var s *Schema
 		for i, d := range src {
-			s := New()
-			if err := s.Extract(d.(map[string]interface{})); err != nil {
-				return err
+			if err := extractSingleSchema(&s, d); err != nil {
+				return errors.Wrap(err, "failed to extract schema list")
 			}
 			(*l)[i] = s
 		}
 		return nil
 	case map[string]interface{}:
-		s := New()
-		if err := s.Extract(v.(map[string]interface{})); err != nil {
-			return err
+		var s *Schema
+		if err := extractSingleSchema(&s, v); err != nil {
+			return errors.Wrap(err, "failed to extract schema list")
 		}
 		*l = []*Schema{s}
 		return nil
-	default:
-		return ErrInvalidSchemaList
 	}
+
+	return errors.Wrap(
+		errInvalidType("[]*Schema or *Schema", v),
+		"failed to extract schema list",
+	)
 }
 
 func extractSchemaMapEntry(s *Schema, name string, m map[string]interface{}) error {
@@ -236,11 +265,10 @@ func extractSchemaMap(m map[string]interface{}, name string) (map[string]*Schema
 	switch v.(type) {
 	case map[string]interface{}:
 	default:
-		return nil, ErrInvalidFieldValue{
-			Message: "value for field should be a map[string]interface{}",
-			Name:    name,
-			Value:   reflect.ValueOf(v),
-		}
+		return nil, errors.Wrap(
+			errInvalidType("map[string]interface{}", v),
+			"failed to extract schema map",
+		)
 	}
 
 	r := make(map[string]*Schema)
@@ -249,11 +277,10 @@ func extractSchemaMap(m map[string]interface{}, name string) (map[string]*Schema
 		switch data.(type) {
 		case map[string]interface{}:
 		default:
-			return nil, ErrInvalidFieldValue{
-				Message: "value for sub-field " + k + " field should be a map[string]interface{}",
-				Name:    name,
-				Value:   reflect.ValueOf(v),
-			}
+			return nil, errors.Wrap(
+				errInvalidType("map[string]interface{}", v),
+				"failed to extract sub field",
+			)
 		}
 
 		s := New()
@@ -272,36 +299,44 @@ func extractSchemaMap(m map[string]interface{}, name string) (map[string]*Schema
 }
 
 func extractRegexpToSchemaMap(m map[string]interface{}, name string) (map[*regexp.Regexp]*Schema, error) {
-	if v, ok := m[name]; ok {
-		switch v.(type) {
+	v, ok := m[name]
+	if !ok {
+		return nil, nil
+	}
+
+	switch v.(type) {
+	case map[string]interface{}:
+	default:
+		return nil, errors.Wrap(
+			errInvalidType("map[string]interface{}", v),
+			"failed to extract regexp to schema map",
+		)
+	}
+
+	r := make(map[*regexp.Regexp]*Schema)
+	for k, data := range v.(map[string]interface{}) {
+		// data better be a map
+		switch data.(type) {
 		case map[string]interface{}:
 		default:
-			return nil, ErrInvalidFieldValue{Name: name}
+			return nil, errors.Wrap(
+				errInvalidType("map[string]interface{}", v),
+				"failed to extract regexp to schema map",
+			)
+		}
+		s := New()
+		if err := s.Extract(data.(map[string]interface{})); err != nil {
+			return nil, errors.Wrap(err, "failed to extract schema within schema map")
 		}
 
-		r := make(map[*regexp.Regexp]*Schema)
-		for k, data := range v.(map[string]interface{}) {
-			// data better be a map
-			switch data.(type) {
-			case map[string]interface{}:
-			default:
-				return nil, ErrInvalidFieldValue{Name: name}
-			}
-			s := New()
-			if err := s.Extract(data.(map[string]interface{})); err != nil {
-				return nil, err
-			}
-
-			rx, err := regexp.Compile(k)
-			if err != nil {
-				return nil, err
-			}
-
-			r[rx] = s
+		rx, err := regexp.Compile(k)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to compile regular expression for regexp to schema map")
 		}
-		return r, nil
+
+		r[rx] = s
 	}
-	return nil, nil
+	return r, nil
 }
 
 func extractItems(res **ItemSpec, m map[string]interface{}, name string) error {
@@ -320,7 +355,10 @@ func extractItems(res **ItemSpec, m map[string]interface{}, name string) error {
 		tupleMode = true
 	case map[string]interface{}:
 	default:
-		return ErrInvalidFieldValue{Name: name}
+		return errors.Wrap(
+			errInvalidType("[]interface{} or map[string]interface{}", v),
+			"failed to extract items",
+		)
 	}
 
 	items := ItemSpec{}
@@ -329,7 +367,7 @@ func extractItems(res **ItemSpec, m map[string]interface{}, name string) error {
 	var err error
 
 	if err = items.Schemas.ExtractIfPresent(m, name); err != nil {
-		return err
+		return errors.Wrap(err, "failed to schema for item")
 	}
 	*res = &items
 	return nil
@@ -344,7 +382,10 @@ func extractDependecies(res *DependencyMap, m map[string]interface{}, name strin
 	switch v.(type) {
 	case map[string]interface{}:
 	default:
-		return ErrInvalidFieldValue{Name: name}
+		return errors.Wrap(
+			errInvalidType("map[string]interface{}", v),
+			"failed to extract dependencies",
+		)
 	}
 
 	m = v.(map[string]interface{})
@@ -353,6 +394,47 @@ func extractDependecies(res *DependencyMap, m map[string]interface{}, name strin
 	}
 
 	return res.extract(m)
+}
+
+func extractType(pt *PrimitiveTypes, m map[string]interface{}, name string) error {
+	v, ok := m[name]
+	if !ok {
+		return nil
+	}
+
+	switch v.(type) {
+	case string:
+		t, err := primitiveFromString(v.(string))
+		if err != nil {
+			return errors.Wrap(err, "failed to parse primitive type")
+		}
+		*pt = PrimitiveTypes{t}
+		return nil
+	case []interface{}:
+		l := v.([]interface{})
+		*pt = make(PrimitiveTypes, len(l))
+		for i, ts := range l {
+			switch ts.(type) {
+			case string:
+			default:
+				return errors.Wrap(
+					errInvalidType("string", ts),
+					"failed to extract type",
+				)
+			}
+			t, err := primitiveFromString(ts.(string))
+			if err != nil {
+				return errors.Wrap(err, "failed to parse primitive type")
+			}
+			(*pt)[i] = t
+		}
+		return nil
+	}
+
+	return errors.Wrap(
+		errInvalidType("[]string or string", v),
+		"failed to extract 'type'",
+	)
 }
 
 func (dm *DependencyMap) extract(m map[string]interface{}) error {
@@ -398,147 +480,111 @@ func (s *Schema) Extract(m map[string]interface{}) error {
 	var err error
 
 	if err = extractString(&s.ID, m, "id"); err != nil {
-		return ErrExtract{Field: "id", Err: err}
+		return errors.Wrapf(err, "failed to extract 'id'")
 	}
 
 	if err = extractString(&s.Title, m, "title"); err != nil {
-		return ErrExtract{Field: "title", Err: err}
+		return errors.Wrap(err, "failed to extract 'title'")
 	}
 
 	if err = extractString(&s.Description, m, "description"); err != nil {
-		return ErrExtract{Field: "description", Err: err}
+		return errors.Wrap(err, "failed to extract 'description'")
 	}
 
 	if err = extractStringList(&s.Required, m, "required"); err != nil {
-		return ErrExtract{Field: "required", Err: err}
+		return errors.Wrap(err, "failed to extract 'required'")
 	}
 
 	if err = extractJSPointer(&s.SchemaRef, m, "$schema"); err != nil {
-		return ErrExtract{Field: "$schema", Err: err}
+		return errors.Wrap(err, "failed to extract '$schema'")
 	}
 
 	if err = extractJSPointer(&s.Reference, m, "$ref"); err != nil {
-		return ErrExtract{Field: "$ref", Err: err}
+		return errors.Wrap(err, "failed to extract '$ref'")
 	}
 
 	if err = extractFormat(&s.Format, m, "format"); err != nil {
-		return ErrExtract{Field: "format", Err: err}
+		return errors.Wrap(err, "failed to extract 'format'")
 	}
 
 	if err = extractInterfaceList(&s.Enum, m, "enum"); err != nil {
-		return ErrExtract{Field: "enum", Err: err}
+		return errors.Wrap(err, "failed to extract 'enum'")
 	}
 
 	if err = extractInterface(&s.Default, m, "default"); err != nil {
-		return ErrExtract{Field: "default", Err: err}
+		return errors.Wrap(err, "failed to extract 'default'")
 	}
 
-	if v, ok := m["type"]; ok {
-		switch v.(type) {
-		case string:
-			t, err := primitiveFromString(v.(string))
-			if err != nil {
-				return ErrExtract{Field: "type", Err: err}
-			}
-			s.Type = PrimitiveTypes{t}
-		case []interface{}:
-			l := v.([]interface{})
-			s.Type = make(PrimitiveTypes, len(l))
-			for i, ts := range l {
-				switch ts.(type) {
-				case string:
-				default:
-					return ErrExtract{
-						Field: "type",
-						Err: ErrInvalidFieldValue{
-							Name:  "type",
-							Value: reflect.ValueOf(v),
-						},
-					}
-				}
-				t, err := primitiveFromString(ts.(string))
-				if err != nil {
-					return err
-				}
-				s.Type[i] = t
-			}
-		default:
-			return ErrExtract{
-				Field: "type",
-				Err: ErrInvalidFieldValue{
-					Name:  "type",
-					Value: reflect.ValueOf(v),
-				},
-			}
-		}
+	if err = extractType(&s.Type, m, "type"); err != nil {
+		return errors.Wrap(err, "failed to extract 'type'")
 	}
 
 	if s.Definitions, err = extractSchemaMap(m, "definitions"); err != nil {
-		return ErrExtract{Field: "definitions", Err: err}
+		return errors.Wrap(err, "failed to extract 'definitions'")
 	}
 
 	if err = extractItems(&s.Items, m, "items"); err != nil {
-		return ErrExtract{Field: "items", Err: err}
+		return errors.Wrap(err, "failed to extract 'items'")
 	}
 
 	if err = extractRegexp(&s.Pattern, m, "pattern"); err != nil {
-		return ErrExtract{Field: "pattern", Err: err}
+		return errors.Wrap(err, "failed to extract 'patterns'")
 	}
 
 	if extractInt(&s.MinLength, m, "minLength"); err != nil {
-		return ErrExtract{Field: "minLength", Err: err}
+		return errors.Wrap(err, "failed to extract 'minLength'")
 	}
 
 	if extractInt(&s.MaxLength, m, "maxLength"); err != nil {
-		return ErrExtract{Field: "maxLength", Err: err}
+		return errors.Wrap(err, "failed to extract 'maxLength'")
 	}
 
 	if extractInt(&s.MinItems, m, "minItems"); err != nil {
-		return ErrExtract{Field: "minItems", Err: err}
+		return errors.Wrap(err, "failed to extract 'minItems'")
 	}
 
 	if extractInt(&s.MaxItems, m, "maxItems"); err != nil {
-		return ErrExtract{Field: "maxItems", Err: err}
+		return errors.Wrap(err, "failed to extract 'maxItems'")
 	}
 
 	if err = extractBool(&s.UniqueItems, m, "uniqueItems", false); err != nil {
-		return ErrExtract{Field: "uniqueItems", Err: err}
+		return errors.Wrap(err, "failed to extract 'uniqueItems'")
 	}
 
 	if err = extractInt(&s.MaxProperties, m, "maxProperties"); err != nil {
-		return ErrExtract{Field: "maxProperties", Err: err}
+		return errors.Wrap(err, "failed to extract 'maxProperties'")
 	}
 
 	if err = extractInt(&s.MinProperties, m, "minProperties"); err != nil {
-		return ErrExtract{Field: "minProperties", Err: err}
+		return errors.Wrap(err, "failed to extract 'minProperties'")
 	}
 
 	if err = extractNumber(&s.Minimum, m, "minimum"); err != nil {
-		return ErrExtract{Field: "minimum", Err: err}
+		return errors.Wrap(err, "failed to extract 'minimum'")
 	}
 
 	if err = extractBool(&s.ExclusiveMinimum, m, "exclusiveMinimum", false); err != nil {
-		return ErrExtract{Field: "exclusiveMinimum", Err: err}
+		return errors.Wrap(err, "failed to extract 'exclusiveMinimum'")
 	}
 
 	if err = extractNumber(&s.Maximum, m, "maximum"); err != nil {
-		return ErrExtract{Field: "maximum", Err: err}
+		return errors.Wrap(err, "failed to extract 'maximum'")
 	}
 
 	if err = extractBool(&s.ExclusiveMaximum, m, "exclusiveMaximum", false); err != nil {
-		return ErrExtract{Field: "exclusiveMaximum", Err: err}
+		return errors.Wrap(err, "failed to extract 'exclusiveMaximum'")
 	}
 
 	if err = extractNumber(&s.MultipleOf, m, "multipleOf"); err != nil {
-		return ErrExtract{Field: "multipleOf", Err: err}
+		return errors.Wrap(err, "failed to extract 'multipleOf'")
 	}
 
 	if s.Properties, err = extractSchemaMap(m, "properties"); err != nil {
-		return ErrExtract{Field: "properties", Err: err}
+		return errors.Wrap(err, "failed to extract 'properties'")
 	}
 
 	if err = extractDependecies(&s.Dependencies, m, "dependencies"); err != nil {
-		return ErrExtract{Field: "dependencies", Err: err}
+		return errors.Wrap(err, "failed to extract 'dependencies'")
 	}
 
 	if _, ok := m["additionalItems"]; !ok {
@@ -554,7 +600,7 @@ func (s *Schema) Extract(m map[string]interface{}) error {
 			// Oh, it's not a boolean?
 			var apSchema *Schema
 			if err = extractSchema(&apSchema, m, "additionalItems"); err != nil {
-				return ErrExtract{Field: "additionalItems", Err: err}
+				return errors.Wrap(err, "failed to extract 'additionalItems'")
 			}
 			s.AdditionalItems = &AdditionalItems{apSchema}
 		}
@@ -573,30 +619,30 @@ func (s *Schema) Extract(m map[string]interface{}) error {
 			// Oh, it's not a boolean?
 			var apSchema *Schema
 			if err = extractSchema(&apSchema, m, "additionalProperties"); err != nil {
-				return ErrExtract{Field: "additionalProperties", Err: err}
+				return errors.Wrap(err, "failed to extract 'additionalProperties'")
 			}
 			s.AdditionalProperties = &AdditionalProperties{apSchema}
 		}
 	}
 
 	if s.PatternProperties, err = extractRegexpToSchemaMap(m, "patternProperties"); err != nil {
-		return ErrExtract{Field: "patternProperties", Err: err}
+		return errors.Wrap(err, "failed to extract 'patternProperties'")
 	}
 
 	if err = s.AllOf.ExtractIfPresent(m, "allOf"); err != nil {
-		return ErrExtract{Field: "allOf", Err: err}
+		return errors.Wrap(err, "failed to extract 'allOf'")
 	}
 
 	if err = s.AnyOf.ExtractIfPresent(m, "anyOf"); err != nil {
-		return ErrExtract{Field: "anyOf", Err: err}
+		return errors.Wrap(err, "failed to extract 'anyOf'")
 	}
 
 	if err = s.OneOf.ExtractIfPresent(m, "oneOf"); err != nil {
-		return ErrExtract{Field: "oneOf", Err: err}
+		return errors.Wrap(err, "failed to extract 'oneOf'")
 	}
 
 	if err = extractSchema(&s.Not, m, "not"); err != nil {
-		return ErrExtract{Field: "not", Err: err}
+		return errors.Wrap(err, "failed to extract 'not'")
 	}
 
 	s.applyParentSchema()
