@@ -6,9 +6,10 @@ import (
 	"github.com/lestrrat/go-jsschema"
 	"github.com/lestrrat/go-jsval"
 	"github.com/lestrrat/go-jsval/builder"
+	"github.com/pkg/errors"
 )
 
-// Validator is an object that wraps jsval.Validator, and
+// Validator is an object that wraps jsval.JSVal, and
 // can be used to validate an object against a schema
 type Validator struct {
 	lock   sync.Mutex
@@ -23,17 +24,30 @@ func New(s *schema.Schema) *Validator {
 	}
 }
 
+// Compile takes the underlying schema and compiles
+// the validator from it.
+// You usually should NOT use this method (the main
+// reason this is exposed is for benchmarking), as it
+// is automatically called when `Validate` is called.
+func (v *Validator) Compile() (*jsval.JSVal, error) {
+	b := builder.New()
+	jsv, err := b.Build(v.schema)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to build validator")
+	}
+	return jsv, nil
+}
+
 func (v *Validator) validator() (*jsval.JSVal, error) {
 	v.lock.Lock()
 	defer v.lock.Unlock()
 
 	if v.jsval == nil {
-		b := builder.New()
-		jsv, err := b.Build(v.schema)
+		val, err := v.Compile()
 		if err != nil {
 			return nil, err
 		}
-		v.jsval = jsv
+		v.jsval = val
 	}
 	return v.jsval, nil
 }
