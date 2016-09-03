@@ -58,7 +58,12 @@ if you really want to do it.
 
 # BENCHMARKS
 
-Latest version of libraries as of Sep 3 2016
+Latest version of libraries as of Sep 3 2016.
+
+Benchmarks with [gojsonschema](https://github.com/xeipuuv/gojsonschema)
+are prefixed with `Gojsonschema`.
+
+Benchmarks without prefixes are about ths package.
 
 ```
 $ go test -tags benchmark -benchmem -bench=.
