@@ -41,6 +41,33 @@ func Example() {
 }
 ```
 
+# DESCRIPTION
+
+This packages parses a JSON Schema file, and allows you to inspect, modify
+the schema, but does nothing more.
+
+If you want to validate using the JSON Schema that you read using this package,
+look at [go-jsval](https://github.com/lestrrat/go-jsval), which allows you to
+generate validators, so that you don't have to dynamically read in the JSON schema
+for each instance of your program.
+
+In the same lines, this package does not really care about loading external
+schemas from various locations (it's just easier to just gather all the schemas
+in your local system). It *is* possible to do this via [go-jsref](https://github.com/lestrrat/go-jsref)
+if you really want to do it.
+
+# BENCHMARKS
+
+Latest version of libraries as of Sep 3 2016
+
+```
+$ go test -tags benchmark -benchmem -bench=.
+BenchmarkGojsonschemaParse-4            5000        357330 ns/op      167451 B/op       1866 allocs/op
+BenchmarkParse-4                     1000000          1577 ns/op        1952 B/op          9 allocs/op
+BenchmarkParseAndMakeValidator-4      500000          2806 ns/op        2304 B/op         13 allocs/op
+PASS
+```
+
 # TODO
 
 * Properly resolve ids and $refs (it works in simple cases, but elaborate scopes probably don't work)
