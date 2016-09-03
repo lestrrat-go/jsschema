@@ -6,11 +6,13 @@ import (
 	"net/url"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/lestrrat/go-jsref"
 	"github.com/lestrrat/go-jsref/provider"
 	"github.com/lestrrat/go-pdebug"
+	"github.com/pkg/errors"
 )
 
 // This is used to check against result of reflect.MapIndex
@@ -151,7 +153,7 @@ func (s *Schema) findSchemaByID(id string) (*Schema, error) {
 	}
 
 	// XXX Quite unimplemented
-	return nil, ErrSchemaNotFound
+	return nil, errors.Errorf("schema %s not found", strconv.Quote(id))
 }
 
 func (s *Schema) ResolveURL(v string) (u *url.URL, err error) {
@@ -229,7 +231,7 @@ func (s *Schema) Resolve(ctx interface{}) (ref *Schema, err error) {
 		}
 		thing, err := s.resolver.Resolve(ctx, s.Reference)
 		if err != nil {
-			err = ErrInvalidReference{Reference: s.Reference, Message: err.Error()}
+			err = errors.Wrapf(err, "failed to resolve reference %s", strconv.Quote(s.Reference))
 			s.resolveLock.Lock()
 			s.resolvedSchemas[s.Reference] = err
 			s.resolveLock.Unlock()
@@ -238,7 +240,7 @@ func (s *Schema) Resolve(ctx interface{}) (ref *Schema, err error) {
 
 		ref, ok = thing.(*Schema)
 		if !ok {
-			err = ErrInvalidReference{Reference: s.Reference, Message: "returned element is not a Schema"}
+			err = errors.Wrapf(err, "resolved reference %s is not a schema", strconv.Quote(s.Reference))
 			s.resolveLock.Lock()
 			s.resolvedSchemas[s.Reference] = err
 			s.resolveLock.Unlock()
