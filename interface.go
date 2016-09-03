@@ -9,18 +9,32 @@ import (
 )
 
 const (
-	SchemaURL      = `http://json-schema.org/draft-04/schema`
+	// SchemaURL contains the JSON Schema URL
+	SchemaURL = `http://json-schema.org/draft-04/schema`
+	// HyperSchemaURL contains the JSON Hyper Schema URL
 	HyperSchemaURL = `http://json-schema.org/draft-03/hyper-schema`
-	MIMEType       = "application/schema+json"
+	// MIMEType contains the MIME used for a JSON Schema
+	MIMEType = "application/schema+json"
 )
 
+// ErrExpectedArrayOfString is returned when we encounter
+// something other than array of strings
 var ErrExpectedArrayOfString = errors.New("invalid value: expected array of string")
+// ErrInvalidStringArray is the same as ErrExpectedArrayOfString.
+// This is here only for backwards compatibility
 var ErrInvalidStringArray = ErrExpectedArrayOfString
 
+// PrimitiveType represents a JSON Schema primitive type such as
+// "string", "integer", etc.
 type PrimitiveType int
+
+// PrimitiveTypes is a list of PrimitiveType
 type PrimitiveTypes []PrimitiveType
+
+// Format represents one of the pre-defined JSON Schema formats
 type Format string
 
+// The list of pre-defined JSON Schema formats
 const (
 	FormatDateTime Format = "date-time"
 	FormatEmail    Format = "email"
@@ -30,22 +44,29 @@ const (
 	FormatURI      Format = "uri"
 )
 
+// Number represents a "number" value in a JSON Schema, such as
+// "minimum", "maximum", etc.
 type Number struct {
 	Val         float64
 	Initialized bool
 }
 
+// Integer represents a "integer" value in a JSON Schema, such as
+// "minLength", "maxLength", etc.
 type Integer struct {
 	Val         int
 	Initialized bool
 }
 
+// Bool represents a "boolean" value in a JSON Schema, such as
+// "exclusiveMinimum", "exclusiveMaximum", etc.
 type Bool struct {
 	Val         bool
 	Default     bool
 	Initialized bool
 }
 
+// The list of primitive types
 const (
 	UnspecifiedType PrimitiveType = iota
 	NullType
@@ -57,7 +78,10 @@ const (
 	NumberType
 )
 
+// SchemaList is a list of Schemas
 type SchemaList []*Schema
+
+// Schema represents a JSON Schema object
 type Schema struct {
 	parent          *Schema
 	resolveLock     sync.Mutex
@@ -109,10 +133,12 @@ type Schema struct {
 	Extras map[string]interface{} `json:"-"`
 }
 
+// AdditionalItems represents schema for additonalItems
 type AdditionalItems struct {
 	*Schema
 }
 
+// AdditionalProperties represents schema for additonalProperties
 type AdditionalProperties struct {
 	*Schema
 }
@@ -125,6 +151,7 @@ type DependencyMap struct {
 	Schemas map[string]*Schema
 }
 
+// ItemSpec represents a specification for `item` field
 type ItemSpec struct {
 	TupleMode bool // If this is true, the positions mean something. if false, len(Schemas) should be 1, and we should apply the same schema validation to all elements
 	Schemas   SchemaList

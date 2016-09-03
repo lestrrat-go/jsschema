@@ -207,7 +207,7 @@ func extractSingleSchema(s **Schema, v interface{}) error {
 	return nil
 }
 
-func (l *SchemaList) ExtractIfPresent(m map[string]interface{}, name string) error {
+func (l *SchemaList) extractIfPresent(m map[string]interface{}, name string) error {
 	v, ok := m[name]
 	if !ok {
 		return nil
@@ -220,6 +220,9 @@ func (l *SchemaList) ExtractIfPresent(m map[string]interface{}, name string) err
 	return l.Extract(v)
 }
 
+// Extract takes either a list of `map[string]interface{}` or
+// a single `map[string]interface{}` to initialize this list
+// of schemas
 func (l *SchemaList) Extract(v interface{}) error {
 	switch v.(type) {
 	case []interface{}:
@@ -366,7 +369,7 @@ func extractItems(res **ItemSpec, m map[string]interface{}, name string) error {
 
 	var err error
 
-	if err = items.Schemas.ExtractIfPresent(m, name); err != nil {
+	if err = items.Schemas.extractIfPresent(m, name); err != nil {
 		return errors.Wrap(err, "failed to schema for item")
 	}
 	*res = &items
@@ -462,6 +465,8 @@ func (dm *DependencyMap) extract(m map[string]interface{}) error {
 	return nil
 }
 
+// UnmarshalJSON takes a JSON string and initializes
+// the schema
 func (s *Schema) UnmarshalJSON(data []byte) error {
 	m := map[string]interface{}{}
 	if err := json.Unmarshal(data, &m); err != nil {
@@ -471,6 +476,8 @@ func (s *Schema) UnmarshalJSON(data []byte) error {
 	return s.Extract(m)
 }
 
+// Extract takes a `map[string]interface{}` and initializes
+// the schema
 func (s *Schema) Extract(m map[string]interface{}) error {
 	if pdebug.Enabled {
 		g := pdebug.IPrintf("START Schema.Extract")
@@ -629,15 +636,15 @@ func (s *Schema) Extract(m map[string]interface{}) error {
 		return errors.Wrap(err, "failed to extract 'patternProperties'")
 	}
 
-	if err = s.AllOf.ExtractIfPresent(m, "allOf"); err != nil {
+	if err = s.AllOf.extractIfPresent(m, "allOf"); err != nil {
 		return errors.Wrap(err, "failed to extract 'allOf'")
 	}
 
-	if err = s.AnyOf.ExtractIfPresent(m, "anyOf"); err != nil {
+	if err = s.AnyOf.extractIfPresent(m, "anyOf"); err != nil {
 		return errors.Wrap(err, "failed to extract 'anyOf'")
 	}
 
-	if err = s.OneOf.ExtractIfPresent(m, "oneOf"); err != nil {
+	if err = s.OneOf.extractIfPresent(m, "oneOf"); err != nil {
 		return errors.Wrap(err, "failed to extract 'oneOf'")
 	}
 
@@ -734,6 +741,7 @@ func canBeType(s *Schema, primType PrimitiveType) bool {
 	return false
 }
 
+// MarshalJSON serializes the schema into a JSON string
 func (s *Schema) MarshalJSON() ([]byte, error) {
 	m := make(map[string]interface{})
 
