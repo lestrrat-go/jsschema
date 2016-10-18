@@ -77,6 +77,11 @@ PASS
 
 * Properly resolve ids and $refs (it works in simple cases, but elaborate scopes probably don't work)
 
+# Contributors
+
+* Daisuke Maki
+* Nate Finch
+
 # References
 
 | Name                                                     | Notes                            |
